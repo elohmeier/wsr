@@ -298,6 +298,61 @@ use wsr_core::pb::real::{Ext, cast};
 
     use super::*;
 
+    struct QuoteUi { now: LocalTime, shown: Vec<PbStr> }
+    impl Ui for QuoteUi {
+        fn local_time(&self) -> LocalTime { self.now }
+        fn msgbox(&mut self, _: &PbStr, _: i32, _: &PbStr) -> i32 { 1 }
+        fn inputbox(&mut self, _: &PbStr, _: &PbStr, default: &PbStr) -> PbStr { default.clone() }
+        fn report(&mut self, _: &PbStr, _: &[PbStr], _: bool) -> ReportAction { ReportAction::Ok }
+        fn news(&mut self, _: &PbStr) {}
+        fn choose(&mut self, _: &PbStr, prompt: &[PbStr], options: &[PbStr]) -> Option<usize> {
+            assert_eq!(options, &[PbStr::from("OK")]);
+            self.shown.extend_from_slice(prompt);
+            Some(0)
+        }
+    }
+
+    #[test]
+    fn startup_quotes_follow_the_host_calendar_across_restarts() {
+        crate::install_test_content();
+        let content = wsr_core::content::current();
+        let entries = TextId::identifiers().zip(wsr_core::content::REQUIRED_IDS).map(|(id, &number)| {
+            (id, if number == 10180 { PbStr::from("@IT") } else { content.text(id).clone() })
+        });
+        let content = ContentPack::from_entries(entries).unwrap().to_bytes();
+        let mut quotes = Vec::new();
+        for day in [1, 3, 4, 366] {
+            quotes.extend_from_slice(format!("@IT{day:03}\r\n").as_bytes());
+            quotes.extend(wsr_core::pb::codec::encode_line(format!("Test quote {day}.").as_bytes()));
+            quotes.extend_from_slice(b"\r\n");
+        }
+        quotes.extend_from_slice(b"@END\r\n");
+        for (year, month, day, expected) in [
+            (2000, 1, 3, Some(3)), (2000, 1, 3, Some(3)), (2000, 1, 4, Some(4)),
+            (2000, 12, 31, Some(366)), (2001, 1, 1, Some(1)), (2001, 1, 2, None),
+        ] {
+            FILES.with(|files| *files.borrow_mut() = Default::default());
+            GAME.with(|game| *game.borrow_mut() = None);
+            RNG.with(|rng| *rng.borrow_mut() = Rng::from_state(123456));
+            put_file(CONTENT_FILE.as_bytes(), &content).unwrap();
+            put_file(b"QUOTEWSR.DAT", &quotes).unwrap();
+            let before = FILES.with(|files| files.borrow().files.clone());
+            let mut ui = QuoteUi { now: LocalTime { year, month, day, ..LocalTime::HARNESS }, shown: vec![] };
+            let result = command_json(&mut ui, 8, 0, b"");
+            assert!(result.contains("\"ok\":true"), "{result}");
+            let expected: Vec<_> = expected.into_iter().map(|day|
+                PbStr::from(format!("Test quote {day}. ").as_str())
+            ).collect();
+            assert_eq!(ui.shown, expected);
+            assert!(GAME.with(|game| game.borrow().is_none()));
+            assert_eq!(RNG.with(|rng| rng.borrow().state()), 123456);
+            FILES.with(|files| {
+                assert_eq!(files.borrow().files, before);
+                assert!(files.borrow().written.is_empty());
+            });
+        }
+    }
+
     fn load_fixture() -> Globals {
         let mut g = Globals::default();
         g.version_str = "9.85".into(); g.game_number = 1; g.name_list_dirty = 1;

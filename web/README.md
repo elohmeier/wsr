@@ -45,6 +45,9 @@ Vite and `python3 web/serve.py 8899` provide these headers locally.
 describes extraction ranges. Only data, documentation, bitmap resources and the
 validated `ENGINE-CONTENT.WSR` catalog are retained in browser storage.
 
+As in the original game, the startup quote follows the local calendar date.
+Restarting on the same day shows the same quote.
+
 The catalog uses `WSRCP002`, a little-endian u32 record count, records of
 `(u32 id, u32 byte length, raw bytes)`, and a trailing CRC32. Windows-1252 bytes
 are preserved. Manifest recipes must contain extraction metadata and structural

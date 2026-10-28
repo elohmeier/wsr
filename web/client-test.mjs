@@ -19,6 +19,38 @@ assert.equal(
 );
 journal.acknowledge(journal.snapshot().revision);
 assert.deepEqual(journal.snapshot().changes, []);
+
+// The engine must receive the browser's local date on every call, including midnight.
+const workerSource = readFileSync(
+	new URL('./worker.js', import.meta.url),
+	'utf8',
+);
+const clockMemory = new ArrayBuffer(7 * 4);
+let browserNow = new Date(2026, 9, 28, 23, 59, 59, 456);
+const host = vm.runInNewContext(
+	workerSource.slice(
+		workerSource.indexOf('const host = {'),
+		workerSource.indexOf('\nfunction take('),
+	) + '\nhost;',
+	{
+		w: { memory: { buffer: clockMemory } },
+		Int32Array,
+		Date: class extends Date {
+			constructor() {
+				super(browserNow.getTime());
+			}
+		},
+	},
+);
+host.host_local_time(0);
+assert.deepEqual(
+	[...new Int32Array(clockMemory)],
+	[2026, 10, 28, 23, 59, 59, 456],
+);
+browserNow = new Date(2026, 9, 29, 0, 0, 0, 0);
+host.host_local_time(0);
+assert.deepEqual([...new Int32Array(clockMemory)], [2026, 10, 29, 0, 0, 0, 0]);
+
 const source = readFileSync(
 	new URL('./src/lib/game.ts', import.meta.url),
 	'utf8',
