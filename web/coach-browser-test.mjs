@@ -217,6 +217,8 @@ try {
 	await button('Use connection');
 	await browser('upload', '#coach-tutorial', tutorial);
 	console.log('Coach browser: configured local model and tutorial.');
+	assert.equal(await evaluate("document.querySelector('#notices').hidden"), true,
+		'Game notifications must not cover the coach composer.');
 	await evaluate(
 		'window.coachCommands=[];window.coachPosted=[];window.coachOriginalPost=Worker.prototype.postMessage;Worker.prototype.postMessage=function(message,...args){if(message.cmd){coachCommands.push(message.cmd);coachPosted.push({cmd:message.cmd,action:message.action,text:message.text?Array.from(message.text):null})}return coachOriginalPost.call(this,message,...args)}',
 	);
@@ -298,6 +300,8 @@ try {
 		)),
 	);
 	await button('Close learning coach');
+	assert.equal(await evaluate("document.querySelector('#notices').hidden"), false,
+		'Game notifications must return after closing the coach.');
 	console.log('Coach browser: verified cancellation.');
 	// Engine dialogs keep their own actions; the coach is opened from the desk menu.
 	assert.equal(

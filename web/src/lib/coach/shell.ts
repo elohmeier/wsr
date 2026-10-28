@@ -130,6 +130,11 @@ function protect(fs: InMemoryFs, reads: Set<string>): IFileSystem {
 				(writeMethods.has(key) || key === 'cp' || key === 'mv')
 			) {
 				return (...args: unknown[]) => {
+					if (
+						(key === 'writeFile' || key === 'appendFile') &&
+						fs.resolvePath('/', String(args[0])) === '/dev/null'
+					)
+						return Promise.resolve(); // A discard sink, never mutable evidence.
 					writable(String(args[key === 'cp' ? 1 : 0]));
 					if (key === 'mv') writable(String(args[1]));
 					return method.apply(target, args);
@@ -157,6 +162,7 @@ export function createShell(
 			...files,
 			'/game/snapshot.json': JSON.stringify(snapshot),
 			'/tmp/.keep': '',
+			'/dev/null': '',
 		},
 		{ maxTotalBytes: 12 * 1024 * 1024 },
 	);
@@ -193,10 +199,13 @@ export function createShell(
 			maxExecutionTimeMs: 3000,
 			maxCommandCount: 1000,
 			maxLoopIterations: 2000,
+			// Projecting public fields across the company list exceeds the hardened
+			// 10,000-iteration jq default; wall time and returned output stay bounded.
+			maxJqIterations: 100000,
 			// Pipes may process a whole company list; only the final tool result reaches the model.
 			maxOutputSize: 2 * 1024 * 1024,
 			maxStringLength: 2 * 1024 * 1024,
-			maxSourceBytes: 8000,
+			maxSourceBytes: 8100,
 			maxFileSystemBytes: 12 * 1024 * 1024,
 		},
 		customCommands: [
@@ -223,7 +232,9 @@ export function createShell(
 			if (command.length > 8000)
 				throw new Error('The shell command is too large.');
 			try {
-				const result = await bash.exec(command, { signal });
+				const result = await bash.exec(`set -o pipefail\n${command}`, {
+					signal,
+				});
 				const truncated =
 					result.stdout.length + result.stderr.length > MAX_COMMAND_OUTPUT;
 				return {

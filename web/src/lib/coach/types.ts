@@ -72,8 +72,9 @@ export type CoachEvent =
 
 export const MAX_COMMAND_OUTPUT = 16000;
 export const MAX_QUESTION = 4000;
-export const MAX_TOOL_CALLS = 10;
-export const MAX_CONTEXT_CHARS = 60000;
+// Research budgets reserve a final answer turn; they must never discard the answer.
+export const MAX_TOOL_CALLS = 32;
+export const COACH_IDLE_TIMEOUT_MS = 120000;
 
 export function scopeOf(snapshot: Snapshot | null): string {
 	return snapshot

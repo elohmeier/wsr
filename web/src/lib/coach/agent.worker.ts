@@ -1,7 +1,11 @@
 import { streamSimple } from '@earendil-works/pi-ai/api/openai-completions';
 import type { Model } from '@earendil-works/pi-ai';
 import { createCoachAgent } from './session';
-import { MAX_QUESTION, validateConnection } from './types';
+import {
+	COACH_IDLE_TIMEOUT_MS,
+	MAX_QUESTION,
+	validateConnection,
+} from './types';
 import type { ChatMessage, CoachEvent, Connection, Snapshot } from './types';
 import type { ShellResult } from './session';
 
@@ -66,7 +70,7 @@ scope.onmessage = async ({ data: message }: MessageEvent) => {
 			input: ['text'],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 32768,
-			maxTokens: 2048,
+			maxTokens: 4096,
 		};
 		shell = new Worker(new URL('./bash.worker.ts', import.meta.url), {
 			type: 'module',
@@ -128,25 +132,32 @@ scope.onmessage = async ({ data: message }: MessageEvent) => {
 				streamSimple(model, context, {
 					...options,
 					apiKey: connection.apiKey || 'local',
-					maxTokens: 1800,
+					maxTokens: model.maxTokens,
 					maxRetryDelayMs: 0,
 				}),
 			exec: (command, signal) =>
 				request<ShellResult>({ type: 'exec', command }, signal),
 		});
-		deadline = setTimeout(() => {
-			timedOut = true;
-			active?.agent.abort();
-			cancelShell?.();
-		}, 90000);
+		// Bound a stalled connection, not total research time. Local models may need
+		// several minutes while still streaming useful progress; Stop stays available.
+		const watchActivity = () => {
+			clearTimeout(deadline);
+			deadline = setTimeout(() => {
+				timedOut = true;
+				active?.agent.abort();
+				cancelShell?.();
+			}, COACH_IDLE_TIMEOUT_MS);
+		};
+		active.agent.subscribe(watchActivity);
+		watchActivity();
 		await active.agent.prompt(message.question.trim());
 		emit({
 			type: 'done',
 			error: timedOut
-				? 'The coach reached its 90-second limit. Ask a more focused question to continue.'
+				? 'The model stopped responding for two minutes. Check your connection and try again.'
 				: (active.agent.state.errorMessage ??
 					(active.limited
-						? 'Research limit reached. Ask a more focused follow-up to continue.'
+						? 'The model kept requesting research instead of answering. Try a follow-up using the evidence collected.'
 						: undefined)),
 		});
 	} catch (error) {

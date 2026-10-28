@@ -7,7 +7,7 @@ import {
 } from '@earendil-works/pi-ai/providers/faux';
 import { createShell, queryGame } from './shell';
 import { createCoachAgent } from './session';
-import { validateConnection } from './types';
+import { MAX_TOOL_CALLS, validateConnection } from './types';
 import type { CoachEvent, Snapshot } from './types';
 
 const snapshot: Snapshot = {
@@ -131,10 +131,30 @@ test('jq can filter a complete company list while oversized final responses are 
 	const count = await shell.exec('wsr companies | jq length');
 	assert.equal(count.stdout.trim(), '1600');
 	assert.equal(count.exitCode, 0);
+	const fields = await shell.exec(
+		"wsr companies | jq -r '.[] | [.id,.name,.symbol,.industryId,.price,.marketCapitalization,.creditRatingRank,.annualDividendPerShare] | @tsv' | head -5",
+	);
+	assert.equal(fields.exitCode, 0);
+	assert.equal(fields.stderr, '');
+	assert.equal(fields.stdout.trim().split('\n').length, 5);
 	const all = await shell.exec('wsr companies');
 	assert.notEqual(all.exitCode, 0);
 	assert.match(all.stderr, /truncated/i);
 	assert.ok(all.stdout.length + all.stderr.length <= 16000);
+});
+
+test('pipeline failures remain errors even when head succeeds', async () => {
+	const shell = createShell(files, snapshot);
+	const result = await shell.exec('wsr company missing | head -5');
+	assert.notEqual(result.exitCode, 0);
+	assert.match(result.stderr, /Unknown company/);
+	const quiet = await shell.exec('wsr company missing 2>/dev/null | head -5');
+	assert.notEqual(quiet.exitCode, 0);
+	assert.equal(quiet.stderr, '');
+	assert.equal(
+		(await shell.exec('echo discarded > /dev/null; cat /dev/null')).stdout,
+		'',
+	);
 });
 
 test('CLI exposes pending screen context but no unseen research or other entity portfolios', () => {
@@ -254,10 +274,166 @@ test('conversation history keeps speaker identity and marks older snapshots', as
 	assert.equal(run.agent.state.errorMessage, undefined);
 });
 
-test('Pi research is bounded even when the model keeps asking for tools', async () => {
+test('strategy research can exceed six turns and 48 KB and still finish normally', async () => {
+	const faux = createFauxCore({ tokensPerSecond: 10000000 });
+	faux.setResponses([
+		...Array.from({ length: 8 }, () =>
+			fauxAssistantMessage(
+				[fauxToolCall('bash', { command: 'cat /docs/long.txt' })],
+				{
+					stopReason: 'toolUse',
+				},
+			),
+		),
+		fauxAssistantMessage('Here is a starting strategy and its risks.'),
+	]);
+	const shell = createShell(
+		{ '/docs/long.txt': 'Evidence. '.repeat(700) },
+		snapshot,
+	);
+	const run = createCoachAgent({
+		model: faux.getModel(),
+		streamFn: faux.streamSimple,
+		snapshot,
+		history: [],
+		exec: (command, signal) => shell.exec(command, signal),
+		emit: () => {},
+	});
+	await run.agent.prompt('Help me build a strategy.');
+	assert.equal(faux.state.callCount, 9);
+	assert.equal(run.limited, false);
+	assert.equal(run.agent.state.errorMessage, undefined);
+});
+
+test('tool budget preserves evidence and reserves a turn with tools disabled for an answer', async () => {
+	const faux = createFauxCore({ tokensPerSecond: 10000000 });
+	faux.setResponses([
+		fauxAssistantMessage(
+			Array.from({ length: MAX_TOOL_CALLS + 2 }, () =>
+				fauxToolCall('bash', { command: 'wsr player' }),
+			),
+			{ stopReason: 'toolUse' },
+		),
+		(context) => {
+			assert.match(
+				JSON.stringify(context.messages),
+				/Tools are now unavailable/,
+			);
+			assert.match(JSON.stringify(context.messages), /toolsRemoved.*bash/);
+			assert.match(JSON.stringify(context.messages), /bankDebt/);
+			return fauxAssistantMessage('Compare your cash with your bank debt.');
+		},
+	]);
+	let executed = 0;
+	const shell = createShell(files, snapshot);
+	const run = createCoachAgent({
+		model: faux.getModel(),
+		streamFn: faux.streamSimple,
+		snapshot,
+		history: [],
+		exec: (command, signal) => {
+			++executed;
+			return shell.exec(command, signal);
+		},
+		emit: () => {},
+	});
+	await run.agent.prompt('Compare my choices.');
+	assert.equal(executed, MAX_TOOL_CALLS);
+	assert.equal(faux.state.callCount, 2);
+	assert.equal(run.limited, false);
+});
+
+test('large research context requests a final answer instead of ending the run', async () => {
+	const faux = createFauxCore({
+		tokensPerSecond: 10000000,
+		models: [{ id: 'small-context', contextWindow: 32768, maxTokens: 4096 }],
+	});
+	faux.setResponses(
+		Array.from({ length: 12 }, () => (context) => {
+			if (
+				JSON.stringify(context.messages).includes('Tools are now unavailable')
+			) {
+				assert.match(JSON.stringify(context.messages), /Evidence/);
+				return fauxAssistantMessage('Answer from the collected evidence.');
+			}
+			return fauxAssistantMessage(
+				[fauxToolCall('bash', { command: 'cat /docs/long.txt' })],
+				{ stopReason: 'toolUse' },
+			);
+		}),
+	);
+	const shell = createShell(
+		{ '/docs/long.txt': 'Evidence. '.repeat(1500) },
+		snapshot,
+	);
+	const events: CoachEvent[] = [];
+	const run = createCoachAgent({
+		model: faux.getModel(),
+		streamFn: faux.streamSimple,
+		snapshot,
+		history: [],
+		exec: (command, signal) => shell.exec(command, signal),
+		emit: (event) => {
+			events.push(event);
+		},
+	});
+	await run.agent.prompt('Explain the evidence.');
+	assert.ok(faux.state.callCount < 12);
+	assert.equal(run.limited, false);
+	assert.ok(
+		events.some(
+			(event) => event.type === 'text' && event.text.includes('Answer from'),
+		),
+	);
+});
+
+test('a large tool batch leaves context space for the final answer', async () => {
+	const faux = createFauxCore({
+		tokensPerSecond: 10000000,
+		models: [{ id: 'small-context', contextWindow: 32768, maxTokens: 4096 }],
+	});
+	faux.setResponses([
+		fauxAssistantMessage(
+			Array.from({ length: 20 }, () =>
+				fauxToolCall('bash', { command: 'cat /docs/long.txt' }),
+			),
+			{ stopReason: 'toolUse' },
+		),
+		(context) => {
+			assert.match(
+				JSON.stringify(context.messages),
+				/Tools are now unavailable/,
+			);
+			assert.ok(JSON.stringify(context.messages).length < 100000);
+			return fauxAssistantMessage('Here is what the available evidence shows.');
+		},
+	]);
+	const shell = createShell(
+		{ '/docs/long.txt': 'Evidence. '.repeat(1500) },
+		snapshot,
+	);
+	let executed = 0;
+	const run = createCoachAgent({
+		model: faux.getModel(),
+		streamFn: faux.streamSimple,
+		snapshot,
+		history: [],
+		exec: (command, signal) => {
+			++executed;
+			return shell.exec(command, signal);
+		},
+		emit: () => {},
+	});
+	await run.agent.prompt('Explain this research.');
+	assert.ok(executed > 0 && executed < 20);
+	assert.equal(faux.state.callCount, 2);
+	assert.equal(run.limited, false);
+});
+
+test('Pi research is bounded even when the model ignores disabled tools', async () => {
 	const faux = createFauxCore({ tokensPerSecond: 100000 });
 	faux.setResponses(
-		Array.from({ length: 20 }, () =>
+		Array.from({ length: MAX_TOOL_CALLS + 4 }, () =>
 			fauxAssistantMessage([fauxToolCall('bash', { command: 'wsr context' })], {
 				stopReason: 'toolUse',
 			}),
@@ -274,7 +450,7 @@ test('Pi research is bounded even when the model keeps asking for tools', async 
 	});
 	await run.agent.prompt('Keep researching.');
 	assert.ok(run.limited);
-	assert.ok(faux.state.callCount <= 6);
+	assert.equal(faux.state.callCount, MAX_TOOL_CALLS + 1);
 });
 
 test('provider configuration accepts secure endpoints and localhost without embedding credentials in URLs', () => {

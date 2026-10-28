@@ -137,6 +137,6 @@
 	/>{/if}
 {#if $game.coachOpened}{#await import('$lib/components/Coach.svelte') then module}<module.default
 		/>{/await}{/if}
-<div id="notices">
+<div id="notices" hidden={$game.coachOpen}>
 	<Toaster theme="dark" position="bottom-right" closeButton />
 </div>

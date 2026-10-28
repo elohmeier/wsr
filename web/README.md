@@ -72,6 +72,12 @@ The ticker pauses while the coach is open. Source citations open local documents
 a local text, Markdown or HTML file for this session. **Stop** cancels a response.
 Starting or loading a game, or changing players, clears the conversation.
 
+Research has no fixed six-turn or total-time cutoff. After 32 tool calls, or when
+the model context needs room for an answer, the coach disables research and asks
+for an explanation from the evidence already collected. A connection with no
+activity for two minutes times out; streaming local models can take longer overall.
+Shell execution and per-command output remain bounded, and Stop is always available.
+
 ## Browser validation
 
 Browser scripts use the `agent-browser` CLI with isolated sessions. With the app
@@ -84,6 +90,21 @@ node web/coach-browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:
 ```
 
 The coach test uses a local scripted model endpoint and makes no paid API calls.
+For an opt-in evaluation with a real local model, start the app and model server, then run:
+
+```sh
+node web/coach-live-test.mjs wsr985.exe --new-game http://127.0.0.1:8899/ http://127.0.0.1:8000/v1 deepseek-v4-flash
+```
+
+Use a save path instead of `--new-game` to evaluate an existing position. This
+tests strategy, a conservative follow-up and unavailable future prices through
+the real browser workers. A temporary localhost proxy adds CORS headers when the
+model server omits them. Timings, replies, tool traces and screenshots are written
+to the ignored `engine/target/tmp/coach-live` directory. Review the replies for
+factual and citation quality; transport assertions alone cannot establish that.
+Use a production preview for repeatable runs, since development reloads clear the
+in-memory conversation. Direct browser connections still require CORS on the model endpoint.
+
 `npm --prefix web run test:installer` compares importer output with files in
 `extracted/app`. For asset-free hosting validation, run
 `node web/hosting-browser-test.mjs URL` against a headerless static host serving
