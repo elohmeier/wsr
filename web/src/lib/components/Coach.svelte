@@ -271,219 +271,221 @@
 				aria-label="Close learning coach">Close</Button
 			>
 		</div>
-		<div class="coach-toolbar">
-			<Button variant="outline" size="sm" onclick={() => (settings = !settings)}
-				>Connection</Button
-			>
-			<Button
-				variant="ghost"
-				size="sm"
-				disabled={busy || !messages.length}
-				onclick={() => {
-					stop();
-					messages = [];
-					tools = [];
-					readPaths = [];
-					notice = '';
-					error = '';
-				}}>New conversation</Button
-			>
-			<label class="coach-import"
-				>Add tutorial<input
-					id="coach-tutorial"
-					type="file"
-					accept=".txt,.md,.htm,.html"
-					onchange={addTutorial}
-					disabled={busy}
-				/></label
-			>
-		</div>
-		{#if settings}
-			<form
-				class="coach-settings"
-				onsubmit={(event) => {
-					event.preventDefault();
-					try {
-						validateConnection({ provider, model, baseUrl, apiKey });
-						error = '';
-						settings = false;
-					} catch (cause) {
-						error = String(cause instanceof Error ? cause.message : cause);
-					}
-				}}
-			>
-				<p>
-					Your questions, retrieved documentation and visible game information
-					are sent directly to your model provider. Your key stays in memory
-					until this page closes. Nothing is sent until you ask.
-				</p>
-				<Field.Field
-					><Field.Label for="coach-provider">Provider</Field.Label><select
-						id="coach-provider"
-						bind:value={provider}
-						disabled={busy}
-						><option value="openrouter">OpenRouter</option><option
-							value="compatible">Compatible API endpoint</option
-						></select
-					></Field.Field
+		<div class="coach-body">
+			<div class="coach-toolbar">
+				<Button variant="outline" size="sm" onclick={() => (settings = !settings)}
+					>Connection</Button
 				>
-				{#if provider === 'compatible'}<Field.Field
-						><Field.Label for="coach-base-url">API base URL</Field.Label><Input
-							id="coach-base-url"
-							bind:value={baseUrl}
-							placeholder="https://your-provider.example/v1"
+				<Button
+					variant="ghost"
+					size="sm"
+					disabled={busy || !messages.length}
+					onclick={() => {
+						stop();
+						messages = [];
+						tools = [];
+						readPaths = [];
+						notice = '';
+						error = '';
+					}}>New conversation</Button
+				>
+				<label class="coach-import"
+					>Add tutorial<input
+						id="coach-tutorial"
+						type="file"
+						accept=".txt,.md,.htm,.html"
+						onchange={addTutorial}
+						disabled={busy}
+					/></label
+				>
+			</div>
+			{#if settings}
+				<form
+					class="coach-settings"
+					onsubmit={(event) => {
+						event.preventDefault();
+						try {
+							validateConnection({ provider, model, baseUrl, apiKey });
+							error = '';
+							settings = false;
+						} catch (cause) {
+							error = String(cause instanceof Error ? cause.message : cause);
+						}
+					}}
+				>
+					<p>
+						Your questions, retrieved documentation and visible game information
+						are sent directly to your model provider. Your key stays in memory
+						until this page closes. Nothing is sent until you ask.
+					</p>
+					<Field.Field
+						><Field.Label for="coach-provider">Provider</Field.Label><select
+							id="coach-provider"
+							bind:value={provider}
+							disabled={busy}
+							><option value="openrouter">OpenRouter</option><option
+								value="compatible">Compatible API endpoint</option
+							></select
+						></Field.Field
+					>
+					{#if provider === 'compatible'}<Field.Field
+							><Field.Label for="coach-base-url">API base URL</Field.Label><Input
+								id="coach-base-url"
+								bind:value={baseUrl}
+								placeholder="https://your-provider.example/v1"
+								disabled={busy}
+							/></Field.Field
+						>{/if}
+					<Field.Field
+						><Field.Label for="coach-model">Model ID</Field.Label><Input
+							id="coach-model"
+							bind:value={model}
+							placeholder="The model ID from your provider"
 							disabled={busy}
 						/></Field.Field
-					>{/if}
-				<Field.Field
-					><Field.Label for="coach-model">Model ID</Field.Label><Input
-						id="coach-model"
-						bind:value={model}
-						placeholder="The model ID from your provider"
-						disabled={busy}
-					/></Field.Field
-				>
-				<Field.Field
-					><Field.Label for="coach-api-key">Your API key</Field.Label><Input
-						id="coach-api-key"
-						type="password"
-						bind:value={apiKey}
-						autocomplete="off"
-						spellcheck={false}
-						disabled={busy}
-					/></Field.Field
-				>
-				<Button type="submit" size="sm" disabled={busy}>Use connection</Button>
-			</form>
-		{/if}
-		{#if error}<Alert.Root variant="destructive" class="coach-error"
-				><Alert.Title>Coach needs attention</Alert.Title><Alert.Description
-					>{error}</Alert.Description
-				></Alert.Root
-			>{/if}
-		{#if notice}<p class="coach-notice" role="status">{notice}</p>{/if}
-		{#if stale}<Marker.Root
-				><Marker.Content
-					>Game state changed. Your next question will use a fresh snapshot.</Marker.Content
-				></Marker.Root
-			>{/if}
-		{#if snapshot?.pendingDialog}<p class="coach-notice">
-				An engine dialog is open. State is from the last completed action; the
-				current screen is included.
-			</p>{/if}
-		<MessageScroller.Provider autoScroll>
-			<MessageScroller.Root class="coach-thread">
-				<MessageScroller.Viewport aria-label="Coach conversation">
-					<MessageScroller.Content aria-busy={busy}>
-						{#if !messages.length}<Empty.Root class="coach-empty"
-								><Empty.Header
-									><Empty.Title>What would you like to understand?</Empty.Title
-									><Empty.Description
-										>Ask about a rule, the current screen, or how to approach
-										your next decision. The coach reads documentation and
-										visible state.</Empty.Description
-									></Empty.Header
-								></Empty.Root
-							>{/if}
-						{#each messages as message (message.id)}
-							<MessageScroller.Item
-								messageId={message.id}
-								scrollAnchor={message.role === 'user'}
-							>
-								<Message.Root align={message.role === 'user' ? 'end' : 'start'}>
-									<Message.Content>
-										<Message.Header
-											>{message.role === 'user'
-												? 'You'
-												: 'Coach'}{#if message.gameDate}<span
-													class="coach-message-date"
-													>{message.gameDate} · view {message.revision}</span
-												>{/if}</Message.Header
-										>
-										{#if message.role === 'user'}<Bubble.Root
-												variant="muted"
-												align="end"
-												><Bubble.Content
-													><div class="coach-prose">
-														{message.text}
-													</div></Bubble.Content
-												></Bubble.Root
-											>{:else}<CoachText
-												text={message.text}
-												{sources}
-												allowed={message.sources}
-												onSource={viewSource}
-											/>{/if}
-										{#if message.role === 'assistant' && citedSources(message).length}<Trace.Collapsible
-												><Trace.CollapsibleTrigger
-													><Trace.Line
-														><Trace.Title
-															>Sources · {citedSources(message)
-																.length}</Trace.Title
-														></Trace.Line
-													></Trace.CollapsibleTrigger
-												><Trace.CollapsibleContent
-													>{#each citedSources(message) as source (source.path)}<button
-															class="coach-source-link"
-															type="button"
-															onclick={() => viewSource(source)}
-															>{source.title}</button
-														>{/each}</Trace.CollapsibleContent
-												></Trace.Collapsible
-											>{/if}
-									</Message.Content>
-								</Message.Root>
-							</MessageScroller.Item>
-						{/each}
-						{#if busy}<Marker.Root
-								><Marker.Content
-									><span class="coach-working"
-										><Spinner />
-										{tools.some((tool) => tool.status === 'running')
-											? 'Reading sources and game state…'
-											: 'Preparing an explanation…'}</span
-									></Marker.Content
-								></Marker.Root
-							>{/if}
-					</MessageScroller.Content>
-				</MessageScroller.Viewport>
-				<MessageScroller.Button behavior="auto" aria-label="Jump to latest" />
-			</MessageScroller.Root>
-		</MessageScroller.Provider>
-		{#if tools.length}<Trace.Collapsible class="coach-tools"
-				><Trace.CollapsibleTrigger
-					><Trace.Line status={busy ? 'running' : undefined}
-						><Trace.Title>Inspection details · {tools.length}</Trace.Title
-						></Trace.Line
-					></Trace.CollapsibleTrigger
-				><Trace.CollapsibleContent
-					><div class="coach-tool-scroll">
-						{#each tools as tool (tool.id)}<Trace.Collapsible
-								><Trace.CollapsibleTrigger
-									><Trace.Line
-										status={tool.status === 'running'
-											? 'running'
-											: tool.status === 'error'
-												? 'error'
-												: undefined}
-										><Trace.Title><code>{tool.command}</code></Trace.Title
-										></Trace.Line
-									></Trace.CollapsibleTrigger
-								><Trace.CollapsibleContent
-									><pre>{tool.output ||
-											'Running…'}</pre></Trace.CollapsibleContent
-								></Trace.Collapsible
-							>{/each}
-					</div></Trace.CollapsibleContent
-				></Trace.Collapsible
-			>{/if}
-		{#if !messages.length}<div class="coach-suggestions">
-				{#each ['Explain this screen', 'Help me decide what to research next', 'Help me build a strategy'] as suggestion}<Button
-						variant="outline"
-						size="sm"
-						onclick={() => (draft = suggestion)}>{suggestion}</Button
-					>{/each}
-			</div>{/if}
+					>
+					<Field.Field
+						><Field.Label for="coach-api-key">Your API key</Field.Label><Input
+							id="coach-api-key"
+							type="password"
+							bind:value={apiKey}
+							autocomplete="off"
+							spellcheck={false}
+							disabled={busy}
+						/></Field.Field
+					>
+					<Button type="submit" size="sm" disabled={busy}>Use connection</Button>
+				</form>
+			{/if}
+			{#if error}<Alert.Root variant="destructive" class="coach-error"
+					><Alert.Title>Coach needs attention</Alert.Title><Alert.Description
+						>{error}</Alert.Description
+					></Alert.Root
+				>{/if}
+			{#if notice}<p class="coach-notice" role="status">{notice}</p>{/if}
+			{#if stale}<Marker.Root
+					><Marker.Content
+						>Game state changed. Your next question will use a fresh snapshot.</Marker.Content
+					></Marker.Root
+				>{/if}
+			{#if snapshot?.pendingDialog}<p class="coach-notice">
+					An engine dialog is open. State is from the last completed action; the
+					current screen is included.
+				</p>{/if}
+			<MessageScroller.Provider autoScroll>
+				<MessageScroller.Root class="coach-thread">
+					<MessageScroller.Viewport aria-label="Coach conversation">
+						<MessageScroller.Content aria-busy={busy}>
+							{#if !messages.length}<Empty.Root class="coach-empty"
+									><Empty.Header
+										><Empty.Title>What would you like to understand?</Empty.Title
+										><Empty.Description
+											>Ask about a rule, the current screen, or how to approach
+											your next decision. The coach reads documentation and
+											visible state.</Empty.Description
+										></Empty.Header
+									></Empty.Root
+								>{/if}
+							{#each messages as message (message.id)}
+								<MessageScroller.Item
+									messageId={message.id}
+									scrollAnchor={message.role === 'user'}
+								>
+									<Message.Root align={message.role === 'user' ? 'end' : 'start'}>
+										<Message.Content>
+											<Message.Header
+												>{message.role === 'user'
+													? 'You'
+													: 'Coach'}{#if message.gameDate}<span
+														class="coach-message-date"
+														>{message.gameDate} · view {message.revision}</span
+													>{/if}</Message.Header
+											>
+											{#if message.role === 'user'}<Bubble.Root
+													variant="muted"
+													align="end"
+													><Bubble.Content
+														><div class="coach-prose">
+															{message.text}
+														</div></Bubble.Content
+													></Bubble.Root
+												>{:else}<CoachText
+													text={message.text}
+													{sources}
+													allowed={message.sources}
+													onSource={viewSource}
+												/>{/if}
+											{#if message.role === 'assistant' && citedSources(message).length}<Trace.Collapsible
+													><Trace.CollapsibleTrigger
+														><Trace.Line
+															><Trace.Title
+																>Sources · {citedSources(message)
+																	.length}</Trace.Title
+															></Trace.Line
+														></Trace.CollapsibleTrigger
+													><Trace.CollapsibleContent
+														>{#each citedSources(message) as source (source.path)}<button
+																class="coach-source-link"
+																type="button"
+																onclick={() => viewSource(source)}
+																>{source.title}</button
+															>{/each}</Trace.CollapsibleContent
+													></Trace.Collapsible
+												>{/if}
+										</Message.Content>
+									</Message.Root>
+								</MessageScroller.Item>
+							{/each}
+							{#if busy}<Marker.Root
+									><Marker.Content
+										><span class="coach-working"
+											><Spinner />
+											{tools.some((tool) => tool.status === 'running')
+												? 'Reading sources and game state…'
+												: 'Preparing an explanation…'}</span
+										></Marker.Content
+									></Marker.Root
+								>{/if}
+						</MessageScroller.Content>
+					</MessageScroller.Viewport>
+					<MessageScroller.Button behavior="auto" aria-label="Jump to latest" />
+				</MessageScroller.Root>
+			</MessageScroller.Provider>
+			{#if tools.length}<Trace.Collapsible class="coach-tools"
+					><Trace.CollapsibleTrigger
+						><Trace.Line status={busy ? 'running' : undefined}
+							><Trace.Title>Inspection details · {tools.length}</Trace.Title
+							></Trace.Line
+						></Trace.CollapsibleTrigger
+					><Trace.CollapsibleContent
+						><div class="coach-tool-scroll">
+							{#each tools as tool (tool.id)}<Trace.Collapsible
+									><Trace.CollapsibleTrigger
+										><Trace.Line
+											status={tool.status === 'running'
+												? 'running'
+												: tool.status === 'error'
+													? 'error'
+													: undefined}
+											><Trace.Title><code>{tool.command}</code></Trace.Title
+											></Trace.Line
+										></Trace.CollapsibleTrigger
+									><Trace.CollapsibleContent
+										><pre>{tool.output ||
+												'Running…'}</pre></Trace.CollapsibleContent
+									></Trace.Collapsible
+								>{/each}
+						</div></Trace.CollapsibleContent
+					></Trace.Collapsible
+				>{/if}
+			{#if !messages.length}<div class="coach-suggestions">
+					{#each ['Explain this screen', 'Help me decide what to research next', 'Help me build a strategy'] as suggestion}<Button
+							variant="outline"
+							size="sm"
+							onclick={() => (draft = suggestion)}>{suggestion}</Button
+						>{/each}
+				</div>{/if}
+		</div>
 		<form
 			class="coach-composer"
 			onsubmit={(event) => {

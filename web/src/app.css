@@ -147,6 +147,7 @@ body:has(.coach-dock) .app-shell {
 .coach-sheet[data-slot='sheet-content'] {
 	width: min(100vw, 480px);
 	max-width: 480px;
+	height: 100dvh;
 	gap: 0;
 }
 .coach-dialog[data-slot='dialog-content'] {
@@ -161,7 +162,22 @@ body:has(.coach-dock) .app-shell {
 	flex-direction: column;
 	height: 100%;
 	min-height: 0;
+	overflow: hidden;
 	font-size: 13px;
+}
+.coach-heading,
+.coach-composer {
+	flex-shrink: 0;
+}
+.coach-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	overflow: auto;
+}
+.coach-body > * {
+	flex-shrink: 0;
 }
 .coach-content button,
 .coach-content input,
@@ -234,7 +250,7 @@ body:has(.coach-dock) .app-shell {
 	overflow: auto;
 }
 .coach-notice,
-.coach-content > [data-slot='marker'] {
+.coach-body > [data-slot='marker'] {
 	margin: 8px 12px;
 	font-size: 12px;
 	color: var(--muted-foreground);
@@ -1046,6 +1062,11 @@ body:has(.coach-dock) .app-shell {
 	}
 }
 @media (max-width: 520px) {
+	.coach-content input,
+	.coach-content textarea,
+	.coach-content select {
+		font-size: 16px;
+	}
 	.wsr-left-column,
 	.wsr-main-column,
 	.wsr-command-deck {

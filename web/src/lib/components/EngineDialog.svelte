@@ -12,6 +12,9 @@
 	import OptionGrid from './OptionGrid.svelte';
 	let { request: r }: { request: UIRequest } = $props();
 	let value = $state(untrack(() => (r.kind === 'inputbox' ? r.value : '')));
+	const acknowledgement = $derived(
+		r.kind === 'choose' && r.options.length === 1 && cleanLabel(r.options[0]) === 'OK',
+	);
 	// Legacy input requests have no field type; keep their initial numeric/amount
 	// presentation stable while editing, including when the field is cleared.
 	const numericInput = $derived(
@@ -50,7 +53,8 @@
 		],
 	};
 	function cancel() {
-		if (r.kind === 'msgbox') {
+		if (acknowledgement) answer(0);
+		else if (r.kind === 'msgbox') {
 			const type = r.style & 15;
 			// Win32 offers no close/cancel action for these button sets.
 			if (type === 2 || type === 4) return;
@@ -76,6 +80,7 @@
 	<Dialog.Content
 		id="dlg"
 		data-kind={r.kind}
+		data-acknowledgement={acknowledgement || undefined}
 		class="wsr-dialog flex max-h-[90dvh] flex-col sm:max-w-5xl"
 		showCloseButton={false}
 		onEscapeKeydown={(event) => {
@@ -155,14 +160,14 @@
 			{:else if r.kind === 'choose'}<div class="whitespace-pre-wrap">
 					{r.prompt.join('\n')}
 				</div>
-				<div class="grid gap-2 sm:grid-cols-2">
+				{#if !acknowledgement}<div class="grid gap-2 sm:grid-cols-2">
 					{#each r.options as option, i}<Button
 							data-choice={i}
 							variant="outline"
 							class="h-auto min-h-9 justify-start whitespace-pre-wrap py-2"
 							onclick={() => answer(i)}>{cleanLabel(option)}</Button
 						>{/each}
-				</div>
+				</div>{/if}
 			{:else if r.kind === 'report'}<pre
 					class="report select-text overflow-auto bg-muted p-4 font-mono text-xs leading-relaxed">{#each r.lines as line}{@const match =
 							line.match(/@([CI])\s*(\d+)\s*$/)}{#if match}<a
@@ -198,6 +203,9 @@
 			{:else if r.kind === 'inputbox'}<Button type="submit" form="answer-form"
 					>OK</Button
 				><Button variant="outline" onclick={() => answer(0)}>Cancel</Button>
+			{:else if r.kind === 'choose' && acknowledgement}<Button
+					onclick={() => answer(0)}>OK</Button
+				>
 			{:else if r.kind === 'choose'}<Button
 					variant="outline"
 					onclick={() => answer(-1)}>Cancel</Button

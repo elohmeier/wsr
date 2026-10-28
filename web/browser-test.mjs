@@ -1,3 +1,4 @@
+import { acknowledgeStartupQuote } from './browser-helpers.mjs';
 // node web/browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
 // Runs the real browser + worker + WASM in an isolated agent-browser session.
 import assert from 'node:assert/strict';
@@ -32,7 +33,7 @@ try {
   browser('open',url);
   browser('set','viewport','1366','768');browser('set','media','light');
   wait("!document.querySelector('#installer').disabled");
-  browser('upload','#installer',resolve(installer)); idle();
+  browser('upload','#installer',resolve(installer)); await acknowledgeStartupQuote(browser); idle();
   browser('upload','#save-file',resolve(save));
   wait("document.querySelector('#dlg')?.textContent.includes('invalid dividends') || (!document.querySelector('#dlg') && !document.querySelector('#installer').disabled)");
   if (evaluate("document.querySelector('#dlg')?.textContent.includes('invalid dividends')")) button('OK');
@@ -135,7 +136,7 @@ try {
   }
   idle();
   assert.ok(evaluate("[...document.querySelectorAll('#saved-games option')].some(o=>/^GAME\\d{2}\\.DAT$/.test(o.value))"));
-  browser('open',url); wait("!document.querySelector('#customizer').disabled");
+  browser('open',url); await acknowledgeStartupQuote(browser); wait("!document.querySelector('#customizer').disabled");
   click('#customizer'); fill('.customizer [data-search]','ZTEST');
   browser('select','.customizer [data-list]','11');
   assert.equal(evaluate("document.querySelector('.customizer [name=name]').value"),'Browser Regression Bank');
@@ -156,7 +157,7 @@ try {
   click('.customizer [type=submit]');click('.customizer [data-save]');
   wait("document.querySelector('.customizer [data-status]').textContent.startsWith('Saved.')");
   click('.customizer [data-close]');
-  browser('open',url);wait("!document.querySelector('#new-game').disabled");click('#new-game');
+  browser('open',url);await acknowledgeStartupQuote(browser);wait("!document.querySelector('#new-game').disabled");click('#new-game');
   for(let i=0;i<20;i++){
     wait("!!document.querySelector('#dlg') || !document.querySelector('#installer').disabled");
     if(!evaluate("!!document.querySelector('#dlg')"))break;

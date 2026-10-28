@@ -1,3 +1,4 @@
+import { acknowledgeStartupQuote } from './browser-helpers.mjs';
 // node web/reliability-browser-test.mjs wsr985.exe GAME01.DAT fixture-directory http://localhost:8899/
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -76,6 +77,7 @@ try {
 		/not been saved/,
 	);
 	browser('upload', '#installer', resolve(installer));
+	await acknowledgeStartupQuote(browser);
 	idle();
 	browser('upload', '#save-file', resolve(save));
 	dismissDividendRecovery();
@@ -185,6 +187,7 @@ try {
 	wait("!document.querySelector('#installer').disabled");
 	evaluate("storageFault=''");
 	click('#retry-storage');
+	await acknowledgeStartupQuote(browser);
 	idle();
 	browser('upload', '#save-file', resolve(fixtures, 'GAME49.DAT'));
 	dismissDividendRecovery();

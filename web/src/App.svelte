@@ -97,13 +97,6 @@
 						id="new-game"
 						disabled={!$game.ready || $game.busy || !prepared}
 						onclick={() => game.action(1)}>New game</Button
-					><Button
-						id="quote"
-						variant="outline"
-						disabled={!$game.ready ||
-							$game.busy ||
-							!$game.files.some((f) => f.name === 'QUOTEWSR.DAT')}
-						onclick={() => game.action(8)}>Quote of the day</Button
 					>
 				</div>
 			</section>{/if}

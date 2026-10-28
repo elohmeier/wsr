@@ -1,3 +1,4 @@
+import { acknowledgeStartupQuote } from './browser-helpers.mjs';
 // Real browser, Pi transport, nested shell worker and WASM; the model endpoint is local and scripted.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -35,6 +36,26 @@ const idle = () =>
 	wait(
 		"!document.querySelector('#dlg') && !document.querySelector('#installer').disabled",
 	);
+async function checkMobileCoach(width, height) {
+	await browser('set', 'viewport', String(width), String(height));
+	await wait("!!document.querySelector('.coach-sheet')");
+	const geometry = await evaluate(`(() => {
+		const bounds = selector => {
+			const element = document.querySelector(selector), r = element.getBoundingClientRect();
+			return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, height:r.height };
+		};
+		return { width:innerWidth, height:innerHeight, pageWidth:document.documentElement.scrollWidth,
+			sheet:bounds('.coach-sheet'), composer:bounds('.coach-composer'),
+			question:bounds('#coach-question'), thread:bounds('.coach-thread') };
+	})()`);
+	for (const key of ['sheet', 'composer', 'question']) {
+		const rect = geometry[key];
+		assert.ok(rect.left >= -1 && rect.top >= -1 && rect.right <= width + 1 && rect.bottom <= height + 1,
+			`${width}×${height}: ${key} is outside the viewport: ${JSON.stringify(geometry)}`);
+	}
+	assert.ok(geometry.pageWidth <= width, `Horizontal page overflow at ${width}×${height}`);
+	assert.ok(geometry.thread.height >= 80, `The conversation has no usable space at ${width}×${height}`);
+}
 const requests = [];
 const sockets = new Set();
 const server = createServer(async (request, response) => {
@@ -67,6 +88,12 @@ const server = createServer(async (request, response) => {
 			`data: ${JSON.stringify({ id: 'local-response', object: 'chat.completion.chunk', created: 1, model: 'coach-test', choices: [{ index: 0, delta, finish_reason }] })}\n\n`,
 		);
 	send({ role: 'assistant', content: '' });
+	if (question.includes('mobile viewport')) {
+		send({ content: 'Mobile viewport response.\n\n' + 'Read the explanation and ask a follow-up.\n\n'.repeat(24) });
+		send({}, 'stop');
+		response.end('data: [DONE]\n\n');
+		return;
+	}
 	if (question.includes('stop this response')) {
 		send({ content: 'This response can be stopped.' });
 		return;
@@ -160,6 +187,7 @@ try {
 	await browser('set', 'viewport', '1440', '1000');
 	await wait("!document.querySelector('#installer').disabled");
 	await browser('upload', '#installer', resolve(installer));
+	await acknowledgeStartupQuote(browser);
 	await idle();
 	await browser('upload', '#save-file', resolve(save));
 	await wait(
@@ -334,6 +362,7 @@ try {
 	await browser('set', 'viewport', '390', '844');
 	await browser('set', 'media', 'dark', 'reduced-motion');
 	await browser('open', url);
+	await acknowledgeStartupQuote(browser);
 	await wait("!document.querySelector('#installer').disabled");
 	await click('#open-coach');
 	await wait("!!document.querySelector('.coach-sheet')");
@@ -356,6 +385,20 @@ try {
 		await evaluate("document.querySelector('#coach-api-key').value"),
 		'',
 	);
+	await browser('select', '#coach-provider', 'compatible');
+	for (const [width, height] of [[390, 844], [375, 667], [320, 568], [844, 390], [390, 420]])
+		await checkMobileCoach(width, height);
+	await fill('#coach-base-url', `http://127.0.0.1:${server.address().port}/v1`);
+	await fill('#coach-model', 'coach-test');
+	await fill('#coach-api-key', 'not-a-real-key');
+	await button('Use connection');
+	await fill('#coach-question', 'Check the mobile viewport.');
+	await button('Send');
+	await wait("document.querySelector('#learning-coach').textContent.includes('Mobile viewport response.') && !document.querySelector('[aria-label=\"Stop response\"]')");
+	for (const [width, height] of [[390, 844], [375, 667], [320, 568], [844, 390], [390, 420]])
+		await checkMobileCoach(width, height);
+	assert.ok(await evaluate("document.querySelector('[data-slot=\"message-scroller-viewport\"]').scrollHeight > document.querySelector('[data-slot=\"message-scroller-viewport\"]').clientHeight"),
+		'The mobile conversation must scroll independently of the composer');
 	await button('Close learning coach');
 	console.log(
 		'Coach browser: real Pi transport and bash worker, source citations, state inspection, no player actions, IME, cancellation, dialogs without coach shortcuts, mobile and game-scope reset passed.',

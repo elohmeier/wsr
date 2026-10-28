@@ -1,3 +1,4 @@
+import { acknowledgeStartupQuote } from './browser-helpers.mjs';
 // node web/content-browser-test.mjs INSTALLER COMPLETE_SAVE URL
 // Each run owns a fresh browser profile; no personal browser storage is used.
 import assert from 'node:assert/strict';
@@ -23,8 +24,8 @@ function open() {
   wait("!document.querySelector('#installer').disabled");
   assert.equal(evaluate('crossOriginIsolated'), true);
 }
-function importInstaller() {
-  browser('upload', '#installer', resolve(installer)); idle();
+async function importInstaller() {
+  browser('upload', '#installer', resolve(installer)); await acknowledgeStartupQuote(browser); idle();
   assert.equal(evaluate("document.querySelector('#new-game').disabled"), false);
 }
 function files() {
@@ -66,7 +67,7 @@ try {
   assert.equal(evaluate("document.querySelector('#new-game').disabled"), true);
   browser('upload', '#save-file', resolve(save)); idle();
   assert.match(evaluate("document.querySelector('#error').textContent"), /Reopen the original installer/);
-  importInstaller();
+  await importInstaller();
   assert.ok(files()[CONTENT_FILE], 'Extracted catalog was not persisted');
   browser('upload', '#save-file', resolve(save));
   wait("!!document.querySelector('#dlg') || !document.querySelector('#installer').disabled");
@@ -93,10 +94,11 @@ try {
     for (const [name, digest] of Object.entries(baseline)) {
       if (name !== CONTENT_FILE) assert.equal(current[name], digest, 'Startup changed ' + name);
     }
-    importInstaller();
+    await importInstaller();
     assert.deepEqual(files(), baseline, 'Reimport changed previously stored game files');
   }
   open();
+  await acknowledgeStartupQuote(browser);
   assert.equal(evaluate("document.querySelector('#new-game').disabled"), false);
   assert.deepEqual(files(), baseline, 'Catalog did not survive the final reload');
   console.log('Runtime content browser: import, save/load, persisted reload, legacy-cache upgrade and malformed-cache recovery passed; all existing file hashes preserved.');

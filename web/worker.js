@@ -5,6 +5,7 @@ import { FileJournal } from './file-journal.mjs';
 import { CONTENT_FILE } from './content.mjs';
 const journal = new FileJournal();
 let w, ctrl, data, lastLink = new Uint8Array();
+let startupQuoteShown = false;
 let coachSession = crypto.randomUUID(), gameRevision = 0, coachSnapshot = null;
 function observe() {
   coachSnapshot = { sessionId: coachSession, revision: gameRevision, capturedAt: new Date().toISOString(), observation: json(call(w.wsr_observe)) };
@@ -73,6 +74,13 @@ function call(fn, bytes, ...args) {
 }
 const json = (bytes) => JSON.parse(utf8.decode(bytes));
 const command = (c, arg = 0, text = new Uint8Array()) => json(call((p, n) => w.wsr_command(c, arg, p, n), text));
+function showStartupQuote() {
+  if (startupQuoteShown) return;
+  const files = new Set(command(0).files.map(file => file.name));
+  if (!files.has(CONTENT_FILE) || !files.has('QUOTEWSR.DAT')) return;
+  startupQuoteShown = true;
+  command(8);
+}
 function putFile(name, bytes) {
   const nb = enc.encode(name), p = w.wsr_alloc(nb.length);
   try {
@@ -101,6 +109,7 @@ onmessage = async ({ data: m }) => {
         }
       }
       postMessage({ type: 'ready', value: command(0), coachSession });
+      showStartupQuote();
       return;
     }
     if (m.cmd === 'observe') {
@@ -158,5 +167,6 @@ onmessage = async ({ data: m }) => {
     }
     journal.record([...imported, ...changes()]);
     postMessage({ type: 'result', id: m.id, value, gameRevision, ...journal.snapshot() });
+    if (m.cmd === 'installer' || m.cmd === 'restore') showStartupQuote();
   } catch (e) { postMessage({ type: 'error', id: m.id, error: e.message || String(e) }); }
 };
