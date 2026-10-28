@@ -7,6 +7,11 @@
 		tutorialSource,
 	} from '$lib/coach/docs';
 	import { MAX_QUESTION, validateConnection } from '$lib/coach/types';
+	import {
+		loadConnection,
+		saveConnection,
+		forgetConnection,
+	} from '$lib/coach/connection';
 	import type {
 		ChatMessage,
 		CoachEvent,
@@ -28,6 +33,7 @@
 	import * as Empty from '$lib/components/ui/empty';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import CoachText from './CoachText.svelte';
 	import CoachSource from './CoachSource.svelte';
@@ -40,6 +46,8 @@
 	let model = $state('');
 	let baseUrl = $state('');
 	let apiKey = $state('');
+	let rememberApiKey = $state(false);
+	let connectionMessage = $state('');
 	let settings = $state(true);
 	let busy = $state(false);
 	let error = $state('');
@@ -66,6 +74,26 @@
 	);
 
 	onMount(() => {
+		try {
+			const saved = loadConnection(localStorage);
+			if (saved) {
+				provider = saved.provider;
+				model = saved.model;
+				baseUrl = saved.baseUrl;
+				apiKey = saved.apiKey;
+				rememberApiKey = saved.rememberApiKey;
+				try {
+					validateConnection(saved);
+					settings = false;
+				} catch {
+					connectionMessage =
+						'Connection settings restored. Enter your API key to continue.';
+				}
+			}
+		} catch {
+			connectionMessage =
+				'Connection settings could not be restored. Enter them for this session.';
+		}
 		const media = matchMedia('(min-width: 1280px)');
 		const update = () => {
 			desktop = media.matches;
@@ -101,6 +129,44 @@
 		}
 		lastScope = scope;
 	});
+
+	function useConnection() {
+		const connection: Connection = { provider, model, baseUrl, apiKey };
+		try {
+			validateConnection(connection);
+		} catch (cause) {
+			error =
+				cause instanceof Error ? cause.message : 'Check the model connection.';
+			return;
+		}
+		try {
+			saveConnection(localStorage, connection, rememberApiKey);
+			connectionMessage = rememberApiKey
+				? 'Connection and API key saved on this device.'
+				: 'Connection settings saved on this device. API key is not remembered.';
+		} catch {
+			connectionMessage =
+				'Connection is available for this session, but could not be saved on this device.';
+		}
+		error = '';
+		settings = false;
+	}
+
+	function forgetSavedConnection() {
+		try {
+			forgetConnection(localStorage);
+		} catch {
+			connectionMessage =
+				'Could not forget the saved connection. Try again when browser storage is available.';
+			return;
+		}
+		provider = 'openrouter';
+		model = baseUrl = apiKey = '';
+		rememberApiKey = false;
+		settings = true;
+		error = '';
+		connectionMessage = 'Connection forgotten on this device.';
+	}
 
 	function stop() {
 		++runId;
@@ -273,8 +339,10 @@
 		</div>
 		<div class="coach-body">
 			<div class="coach-toolbar">
-				<Button variant="outline" size="sm" onclick={() => (settings = !settings)}
-					>Connection</Button
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={() => (settings = !settings)}>Connection</Button
 				>
 				<Button
 					variant="ghost"
@@ -304,19 +372,14 @@
 					class="coach-settings"
 					onsubmit={(event) => {
 						event.preventDefault();
-						try {
-							validateConnection({ provider, model, baseUrl, apiKey });
-							error = '';
-							settings = false;
-						} catch (cause) {
-							error = String(cause instanceof Error ? cause.message : cause);
-						}
+						useConnection();
 					}}
 				>
 					<p>
 						Your questions, retrieved documentation and visible game information
-						are sent directly to your model provider. Your key stays in memory
-						until this page closes. Nothing is sent until you ask.
+						are sent directly to your model provider. Connection settings are
+						saved on this device when you choose Use connection. Nothing is sent
+						until you ask.
 					</p>
 					<Field.Field
 						><Field.Label for="coach-provider">Provider</Field.Label><select
@@ -329,7 +392,8 @@
 						></Field.Field
 					>
 					{#if provider === 'compatible'}<Field.Field
-							><Field.Label for="coach-base-url">API base URL</Field.Label><Input
+							><Field.Label for="coach-base-url">API base URL</Field.Label
+							><Input
 								id="coach-base-url"
 								bind:value={baseUrl}
 								placeholder="https://your-provider.example/v1"
@@ -354,9 +418,39 @@
 							disabled={busy}
 						/></Field.Field
 					>
-					<Button type="submit" size="sm" disabled={busy}>Use connection</Button>
+					<Field.Field orientation="horizontal">
+						<Checkbox
+							id="coach-remember-key"
+							bind:checked={rememberApiKey}
+							disabled={busy}
+						/>
+						<Field.Content>
+							<Field.Label for="coach-remember-key"
+								>Remember API key on this device</Field.Label
+							>
+							<Field.Description
+								>The key will be saved in this app’s browser storage. Otherwise
+								it stays in memory for this session.</Field.Description
+							>
+						</Field.Content>
+					</Field.Field>
+					<div class="coach-connection-actions">
+						<Button type="submit" size="sm" disabled={busy}
+							>Use connection</Button
+						>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={busy}
+							onclick={forgetSavedConnection}>Forget connection</Button
+						>
+					</div>
 				</form>
 			{/if}
+			{#if connectionMessage}<p class="coach-notice" role="status">
+					{connectionMessage}
+				</p>{/if}
 			{#if error}<Alert.Root variant="destructive" class="coach-error"
 					><Alert.Title>Coach needs attention</Alert.Title><Alert.Description
 						>{error}</Alert.Description
@@ -378,7 +472,8 @@
 						<MessageScroller.Content aria-busy={busy}>
 							{#if !messages.length}<Empty.Root class="coach-empty"
 									><Empty.Header
-										><Empty.Title>What would you like to understand?</Empty.Title
+										><Empty.Title
+											>What would you like to understand?</Empty.Title
 										><Empty.Description
 											>Ask about a rule, the current screen, or how to approach
 											your next decision. The coach reads documentation and
@@ -391,7 +486,9 @@
 									messageId={message.id}
 									scrollAnchor={message.role === 'user'}
 								>
-									<Message.Root align={message.role === 'user' ? 'end' : 'start'}>
+									<Message.Root
+										align={message.role === 'user' ? 'end' : 'start'}
+									>
 										<Message.Content>
 											<Message.Header
 												>{message.role === 'user'

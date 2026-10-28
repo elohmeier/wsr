@@ -7,6 +7,12 @@ import {
 } from '@earendil-works/pi-ai/providers/faux';
 import { createShell, queryGame } from './shell';
 import { createCoachAgent } from './session';
+import {
+	CONNECTION_STORAGE_KEY,
+	loadConnection,
+	saveConnection,
+	forgetConnection,
+} from './connection';
 import { MAX_TOOL_CALLS, validateConnection } from './types';
 import type { CoachEvent, Snapshot } from './types';
 
@@ -40,6 +46,138 @@ const files = {
 	'/docs/help/001.txt': 'Borrowing\n\nMargin debt increases leverage.\n',
 	'/docs/INDEX.md': 'See /docs/help/001.txt\n',
 };
+
+function settingsStorage() {
+	const values = new Map<string, string>();
+	return {
+		values,
+		getItem: (key: string) => values.get(key) ?? null,
+		setItem: (key: string, value: string) => {
+			values.set(key, value);
+		},
+		removeItem: (key: string) => {
+			values.delete(key);
+		},
+	};
+}
+const connection = {
+	provider: 'openrouter' as const,
+	model: 'coach-test',
+	baseUrl: '',
+	apiKey: 'not-a-real-key',
+};
+
+test('connection settings persist without storing an API key by default', () => {
+	const storage = settingsStorage();
+	saveConnection(storage, { ...connection, model: ' coach-test ' }, false);
+	assert.doesNotMatch(
+		storage.getItem(CONNECTION_STORAGE_KEY)!,
+		/not-a-real-key|"apiKey"/,
+	);
+	assert.deepEqual(loadConnection(storage), {
+		...connection,
+		apiKey: '',
+		rememberApiKey: false,
+	});
+	assert.throws(() => validateConnection(loadConnection(storage)!), /API key/);
+});
+
+test('remembering a key survives restoration and opting out removes its persisted value', () => {
+	const storage = settingsStorage();
+	saveConnection(storage, connection, true);
+	assert.deepEqual(loadConnection(storage), {
+		...connection,
+		rememberApiKey: true,
+	});
+	saveConnection(storage, connection, false);
+	assert.doesNotMatch(
+		storage.getItem(CONNECTION_STORAGE_KEY)!,
+		/not-a-real-key|"apiKey"/,
+	);
+	assert.equal(loadConnection(storage)?.apiKey, '');
+});
+
+test('forgetting a connection only deletes its settings record', () => {
+	const storage = settingsStorage();
+	storage.setItem('other-app-setting', 'untouched');
+	saveConnection(storage, connection, true);
+	forgetConnection(storage);
+	assert.equal(loadConnection(storage), null);
+	assert.equal(storage.getItem('other-app-setting'), 'untouched');
+});
+
+test('malformed, obsolete and insecure stored connections are ignored', () => {
+	const storage = settingsStorage();
+	for (const raw of [
+		'{broken',
+		'null',
+		'{}',
+		JSON.stringify({ ...connection, version: 2, rememberApiKey: true }),
+		JSON.stringify({ ...connection, version: 1, rememberApiKey: 'true' }),
+		JSON.stringify({
+			...connection,
+			version: 1,
+			provider: 'unknown',
+			rememberApiKey: true,
+		}),
+		JSON.stringify({
+			...connection,
+			version: 1,
+			model: '',
+			rememberApiKey: false,
+		}),
+		JSON.stringify({
+			...connection,
+			version: 1,
+			provider: 'compatible',
+			baseUrl: 'http://example.com/v1',
+			rememberApiKey: true,
+		}),
+	]) {
+		storage.setItem(CONNECTION_STORAGE_KEY, raw);
+		assert.equal(loadConnection(storage), null, raw);
+	}
+	storage.setItem(
+		CONNECTION_STORAGE_KEY,
+		JSON.stringify({ ...connection, version: 1, rememberApiKey: false }),
+	);
+	assert.equal(
+		loadConnection(storage)?.apiKey,
+		'',
+		'An unselected remember flag must never restore a stray key.',
+	);
+});
+
+test('connection persistence stores only profile fields and surfaces unavailable storage', () => {
+	const storage = settingsStorage();
+	const withEvidence = {
+		...connection,
+		conversation: 'private-discussion',
+		snapshot: { game: 'private-game' },
+	};
+	saveConnection(storage, withEvidence, true);
+	assert.doesNotMatch(
+		storage.getItem(CONNECTION_STORAGE_KEY)!,
+		/private-discussion|private-game|conversation|snapshot/,
+	);
+	const unavailable = {
+		getItem: () => {
+			throw new Error('Storage unavailable');
+		},
+		setItem: () => {
+			throw new Error('Storage unavailable');
+		},
+		removeItem: () => {
+			throw new Error('Storage unavailable');
+		},
+	};
+	assert.throws(() => loadConnection(unavailable), /Storage unavailable/);
+	assert.throws(
+		() => saveConnection(unavailable, connection, true),
+		/Storage unavailable/,
+	);
+	assert.throws(() => forgetConnection(unavailable), /Storage unavailable/);
+});
 
 test('real browser shell composes documentation search, read-only CLI and jq', async () => {
 	const shell = createShell(files, snapshot);

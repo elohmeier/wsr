@@ -36,6 +36,15 @@ const idle = () =>
 	wait(
 		"!document.querySelector('#dlg') && !document.querySelector('#installer').disabled",
 	);
+const connectionKey = 'wsr-coach-connection-v1';
+const storedConnection = () => evaluate(`localStorage.getItem('${connectionKey}')`);
+async function reopenCoach() {
+	await browser('open', url);
+	await acknowledgeStartupQuote(browser);
+	await idle();
+	await click('#open-coach');
+	await wait("!!document.querySelector('#learning-coach')");
+}
 async function checkMobileCoach(width, height) {
 	await browser('set', 'viewport', String(width), String(height));
 	await wait("!!document.querySelector('.coach-sheet')");
@@ -358,11 +367,12 @@ try {
 		)),
 		'Loading a game must clear the previous conversation.',
 	);
-	assert.equal(await evaluate('Object.keys(localStorage).length'), 0);
+	assert.equal(await evaluate('Object.keys(localStorage).length'), 1);
+	assert.doesNotMatch(await storedConnection(), /not-a-real-key|"apiKey"/);
 	await button('Close learning coach');
 	console.log('Coach browser: verified dialog actions and game-scope reset.');
 	// Open a fresh compact view, including connection setup. This also verifies that
-	// credentials/conversation are not restored after navigation.
+	// the profile survives while unremembered credentials/conversation do not.
 	await browser('set', 'viewport', '390', '844');
 	await browser('set', 'media', 'dark', 'reduced-motion');
 	await browser('open', url);
@@ -370,6 +380,11 @@ try {
 	await wait("!document.querySelector('#installer').disabled");
 	await click('#open-coach');
 	await wait("!!document.querySelector('.coach-sheet')");
+	await button('Connection');
+	await wait("!!document.querySelector('#coach-provider')");
+	assert.equal(await evaluate("document.querySelector('#coach-provider').value"), 'compatible');
+	assert.equal(await evaluate("document.querySelector('#coach-model').value"), 'coach-test');
+	assert.equal(await evaluate("document.querySelector('#coach-base-url').value"), `http://127.0.0.1:${server.address().port}/v1`);
 	assert.ok(
 		await evaluate(
 			"document.querySelector('.coach-sheet').getBoundingClientRect().width <= innerWidth",
@@ -403,6 +418,60 @@ try {
 		await checkMobileCoach(width, height);
 	assert.ok(await evaluate("document.querySelector('[data-slot=\"message-scroller-viewport\"]').scrollHeight > document.querySelector('[data-slot=\"message-scroller-viewport\"]').clientHeight"),
 		'The mobile conversation must scroll independently of the composer');
+	const savedGames = await evaluate("[...document.querySelectorAll('#saved-games option')].map(o=>o.value)");
+	const requestsBeforePersistence = requests.length;
+	await button('Connection');
+	await wait("!!document.querySelector('#coach-provider')");
+	await browser('select', '#coach-provider', 'openrouter');
+	await fill('#coach-model', 'openrouter-reload-test');
+	await fill('#coach-api-key', 'not-a-real-openrouter-key');
+	await click('#coach-remember-key');
+	await button('Use connection');
+	assert.equal(JSON.parse(await storedConnection()).apiKey, 'not-a-real-openrouter-key');
+	await reopenCoach();
+	await wait("!document.querySelector('#coach-provider')");
+	assert.ok(!(await evaluate("document.querySelector('#learning-coach').textContent.includes('Mobile viewport response.')")),
+		'Only connection settings, not conversations, are restored.');
+	await button('Connection');
+	await wait("!!document.querySelector('#coach-provider')");
+	assert.equal(await evaluate("document.querySelector('#coach-provider').value"), 'openrouter');
+	assert.equal(await evaluate("document.querySelector('#coach-model').value"), 'openrouter-reload-test');
+	assert.equal(await evaluate("document.querySelector('#coach-api-key').value"), 'not-a-real-openrouter-key');
+	assert.equal(await evaluate("document.querySelector('#coach-remember-key').getAttribute('aria-checked')"), 'true');
+	await click('#coach-remember-key');
+	await button('Use connection');
+	assert.doesNotMatch(await storedConnection(), /not-a-real-openrouter-key|"apiKey"/);
+	await reopenCoach();
+	await wait("!!document.querySelector('#coach-provider')");
+	assert.equal(await evaluate("document.querySelector('#coach-model').value"), 'openrouter-reload-test');
+	assert.equal(await evaluate("document.querySelector('#coach-api-key').value"), '');
+	assert.equal(await evaluate("document.querySelector('#coach-remember-key').getAttribute('aria-checked')"), 'false');
+	await button('Forget connection');
+	assert.equal(await storedConnection(), null);
+	assert.equal(await evaluate("document.querySelector('#coach-model').value"), '');
+	assert.equal(await evaluate("document.querySelector('#coach-api-key').value"), '');
+	assert.deepEqual(await evaluate("[...document.querySelectorAll('#saved-games option')].map(o=>o.value)"), savedGames,
+		'Forgetting a connection must preserve saved games.');
+	await reopenCoach();
+	await wait("!!document.querySelector('#coach-provider')");
+	assert.equal(await evaluate("document.querySelector('#coach-model').value"), '');
+	assert.equal(await evaluate("document.querySelector('#coach-api-key').value"), '');
+	assert.equal(requests.length, requestsBeforePersistence,
+		'Restoring or forgetting credentials must never send a model request.');
+	console.log('Coach browser: connection profile, opt-in OpenRouter key, opt-out and forget survive fresh navigation; game saves preserved.');
+	// A denied storage write must not prevent using the connection for this session.
+	await evaluate(`window.originalStorageSet=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key==='${connectionKey}')throw new DOMException('Storage disabled','SecurityError');return originalStorageSet.call(this,key,value)}`);
+	await browser('select', '#coach-provider', 'compatible');
+	await fill('#coach-base-url', `http://127.0.0.1:${server.address().port}/v1`);
+	await fill('#coach-model', 'coach-test');
+	await button('Use connection');
+	await wait("document.querySelector('#learning-coach').textContent.includes('could not be saved on this device')");
+	await evaluate('Storage.prototype.setItem=originalStorageSet');
+	assert.equal(await storedConnection(), null);
+	await fill('#coach-question', 'Check the mobile viewport.');
+	await button('Send');
+	await wait("document.querySelector('#learning-coach').textContent.includes('Mobile viewport response.') && !document.querySelector('[aria-label=\"Stop response\"]')");
+	console.log('Coach browser: unavailable storage is reported and session-only model access still works.');
 	await button('Close learning coach');
 	console.log(
 		'Coach browser: real Pi transport and bash worker, source citations, state inspection, no player actions, IME, cancellation, dialogs without coach shortcuts, mobile and game-scope reset passed.',

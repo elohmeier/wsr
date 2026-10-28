@@ -82,10 +82,17 @@ export function scopeOf(snapshot: Snapshot | null): string {
 		: 'none';
 }
 
-export function validateConnection(connection: Connection): void {
+export function validateConnection(
+	connection: Connection,
+	{ requireApiKey = true }: { requireApiKey?: boolean } = {},
+): void {
 	if (!connection.model.trim() || connection.model.length > 200)
 		throw new Error('Enter a model ID.');
-	if (connection.provider === 'openrouter' && !connection.apiKey.trim())
+	if (
+		requireApiKey &&
+		connection.provider === 'openrouter' &&
+		!connection.apiKey.trim()
+	)
 		throw new Error('Enter your API key.');
 	const url = new URL(
 		connection.provider === 'openrouter'

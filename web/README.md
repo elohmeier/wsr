@@ -60,7 +60,12 @@ engine/target/owner-content.pack` creates a private resource pack. See the
 Open **Learning coach** in the desk menu, then **Connection**. Enter your own
 model ID and API key for OpenRouter or a browser-accessible chat-completions
 endpoint. Custom endpoints need HTTPS (HTTP on localhost), CORS and streaming
-tool-call support. Keys and conversations stay in memory for the page session.
+tool-call support. **Use connection** saves your provider, model and endpoint on
+this device, including when launched from an iPhone Home Screen icon. Enable
+**Remember API key on this device** to also save the key in local browser storage;
+otherwise it stays in memory for the page session. Uncheck it and choose
+**Use connection** to remove a previously saved key. **Forget connection** removes
+the saved profile and key without touching game saves. Conversations stay in memory.
 
 The coach uses Pi and a just-bash worker to search imported documentation and
 inspect a frozen snapshot of player-visible state. Retrieved excerpts and queried

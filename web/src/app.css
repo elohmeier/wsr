@@ -243,6 +243,11 @@ body:has(.coach-dock) .app-shell {
 	border: 1px solid var(--input);
 	background: var(--background);
 }
+.coach-connection-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
 .coach-error {
 	margin: 8px 12px;
 	width: auto;
