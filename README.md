@@ -19,6 +19,10 @@ play; installer extraction and gameplay run locally in your browser.
 Use a current browser with JavaScript and local storage enabled. On the first
 visit, the page may reload once to prepare the game worker.
 
+On iPhone or iPad, open the app in Safari and choose **Share → Add to Home
+Screen → Add**. Leave **Open as Web App** enabled if shown. Launch it from the
+new **WSR** icon to play.
+
 ## Features and compatibility
 
 - Trading in stocks, bonds, options and futures, company management, and AI players.

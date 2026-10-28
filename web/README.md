@@ -24,6 +24,11 @@ The [CI workflow](../.github/workflows/ci.yml) checks every pull request and dep
 `web/dist` to [GitHub Pages](https://elohmeier.github.io/wsr/) after successful
 pushes to `main`. It can also be run manually from Actions.
 
+`public/manifest.webmanifest` defines the Home Screen app's name, standalone
+display mode, icons and launch URL. Its paths are relative to keep installs scoped
+to `/wsr/` on Pages and to the app's directory on other hosts. iOS uses the linked
+180px Apple touch icon. The system keeps content within the screen's safe area.
+
 The engine needs `SharedArrayBuffer` and cross-origin isolation on HTTPS or
 localhost. On GitHub Pages, the included service worker enables isolation and may
 reload the first visit once. Relative asset paths support the `/wsr/` subpath.
