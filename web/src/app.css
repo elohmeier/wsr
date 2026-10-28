@@ -302,6 +302,95 @@ body:has(.coach-dock) .app-shell {
 	background: var(--muted);
 	padding: 1px 3px;
 }
+.coach-markdown {
+	min-width: 0;
+	max-width: 100%;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.65;
+	user-select: text;
+}
+.coach-markdown :is(p, ul, ol, blockquote, pre, table, hr) {
+	margin-block: 0.75em;
+}
+.coach-markdown :is(h1, h2, h3, h4, h5, h6) {
+	margin-block: 1em 0.4em;
+	font-size: 1em;
+	font-weight: 600;
+	line-height: 1.35;
+	color: var(--foreground);
+}
+.coach-markdown h1 {
+	font-size: 1.25em;
+}
+.coach-markdown h2 {
+	font-size: 1.15em;
+}
+.coach-markdown ul {
+	list-style: disc;
+	padding-inline-start: 1.5em;
+}
+.coach-markdown ol {
+	list-style: decimal;
+	padding-inline-start: 1.5em;
+}
+.coach-markdown li {
+	margin-block: 0.25em;
+}
+.coach-markdown li :is(ul, ol, p) {
+	margin-block: 0.25em;
+}
+.coach-markdown blockquote {
+	border-inline-start: 2px solid var(--border);
+	padding-inline-start: 0.9em;
+	color: var(--muted-foreground);
+}
+.coach-markdown code {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+	background: var(--muted);
+	padding: 1px 3px;
+}
+.coach-markdown pre {
+	max-width: 100%;
+	overflow-x: auto;
+	white-space: pre;
+	background: var(--muted);
+	padding: 10px;
+}
+.coach-markdown pre code {
+	padding: 0;
+	background: none;
+}
+.coach-markdown table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.95em;
+	overflow-wrap: normal;
+}
+.coach-markdown [data-streamdown-table] {
+	max-width: 100%;
+	overflow-x: auto;
+}
+.coach-markdown :is(th, td) {
+	border: 1px solid var(--border);
+	padding: 6px 9px;
+	text-align: left;
+	vertical-align: top;
+}
+.coach-markdown th {
+	background: var(--muted);
+	font-weight: 600;
+}
+.coach-markdown hr {
+	border-color: var(--border);
+}
+.coach-markdown > div > :first-child {
+	margin-top: 0;
+}
+.coach-markdown > div > :last-child {
+	margin-bottom: 0;
+}
 .coach-citation,
 .coach-source-link {
 	color: var(--ring);

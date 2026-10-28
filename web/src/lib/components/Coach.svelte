@@ -16,6 +16,7 @@
 		ChatMessage,
 		CoachEvent,
 		Connection,
+		MessageStatus,
 		Snapshot,
 		Source,
 		ToolEntry,
@@ -175,10 +176,17 @@
 		worker = undefined;
 		if (busy) notice = 'Response stopped. You can ask a follow-up.';
 		busy = false;
+		finishMessages('stopped');
 		tools = tools.map((tool) =>
 			tool.status === 'running'
 				? { ...tool, status: 'error', output: 'Stopped.' }
 				: tool,
+		);
+	}
+
+	function finishMessages(status: MessageStatus) {
+		messages = messages.map((message) =>
+			message.status === 'streaming' ? { ...message, status } : message,
 		);
 	}
 
@@ -233,7 +241,12 @@
 					if (found)
 						messages = messages.map((m) =>
 							m.id === data.id
-								? { ...m, text: data.text, sources: [...readPaths] }
+								? {
+										...m,
+										text: data.text,
+										status: data.status,
+										sources: [...readPaths],
+									}
 								: m,
 						);
 					else
@@ -243,6 +256,7 @@
 								id: data.id,
 								role: 'assistant',
 								text: data.text,
+								status: data.status,
 								sources: [...readPaths],
 								revision: snapshot?.revision ?? 0,
 								gameDate: snapshot?.observation.context?.gameDate ?? '',
@@ -261,12 +275,20 @@
 					readPaths = [...new Set([...readPaths, ...data.paths])];
 				else if (data.type === 'done') {
 					busy = false;
+					finishMessages(
+						data.error
+							? /abort/i.test(data.error)
+								? 'stopped'
+								: 'error'
+							: 'complete',
+					);
 					if (data.error && !/abort/i.test(data.error)) error = data.error;
 				}
 			};
 			worker.onerror = () => {
 				if (id === runId) {
 					busy = false;
+					finishMessages('error');
 					error = 'The coach stopped. Try again; your game is unaffected.';
 					worker?.terminate();
 					worker = undefined;
@@ -283,6 +305,7 @@
 			});
 		} catch (cause) {
 			busy = false;
+			finishMessages('error');
 			error =
 				cause instanceof Error ? cause.message : 'Unable to start the coach.';
 		}
@@ -306,15 +329,6 @@
 	}
 	function viewSource(source: Source, line = 1) {
 		sourceView = { source, line };
-	}
-	function citedSources(message: ChatMessage) {
-		const paths = [
-			...message.text.matchAll(/\]\((\/docs\/[^#)]+)(?:#[^)]*)?\)/g),
-		].map((match) => match[1]);
-		return sources.filter(
-			(source) =>
-				paths.includes(source.path) && message.sources.includes(source.path),
-		);
 	}
 </script>
 
@@ -508,27 +522,11 @@
 													></Bubble.Root
 												>{:else}<CoachText
 													text={message.text}
+													status={message.status}
 													{sources}
 													allowed={message.sources}
 													onSource={viewSource}
 												/>{/if}
-											{#if message.role === 'assistant' && citedSources(message).length}<Trace.Collapsible
-													><Trace.CollapsibleTrigger
-														><Trace.Line
-															><Trace.Title
-																>Sources · {citedSources(message)
-																	.length}</Trace.Title
-															></Trace.Line
-														></Trace.CollapsibleTrigger
-													><Trace.CollapsibleContent
-														>{#each citedSources(message) as source (source.path)}<button
-																class="coach-source-link"
-																type="button"
-																onclick={() => viewSource(source)}
-																>{source.title}</button
-															>{/each}</Trace.CollapsibleContent
-													></Trace.Collapsible
-												>{/if}
 										</Message.Content>
 									</Message.Root>
 								</MessageScroller.Item>

@@ -50,6 +50,7 @@ export interface Connection {
 	baseUrl: string;
 	apiKey: string;
 }
+export type MessageStatus = 'streaming' | 'complete' | 'stopped' | 'error';
 export interface ChatMessage {
 	id: string;
 	role: 'user' | 'assistant';
@@ -57,6 +58,7 @@ export interface ChatMessage {
 	sources: string[];
 	revision: number;
 	gameDate: string;
+	status?: MessageStatus;
 }
 export interface ToolEntry {
 	id: string;
@@ -65,7 +67,7 @@ export interface ToolEntry {
 	output: string;
 }
 export type CoachEvent =
-	| { type: 'text'; id: string; text: string }
+	| { type: 'text'; id: string; text: string; status: MessageStatus }
 	| { type: 'tool'; entry: ToolEntry }
 	| { type: 'sources'; paths: string[] }
 	| { type: 'done'; error?: string };

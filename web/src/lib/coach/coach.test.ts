@@ -7,6 +7,7 @@ import {
 } from '@earendil-works/pi-ai/providers/faux';
 import { createShell, queryGame } from './shell';
 import { createCoachAgent } from './session';
+import { citationSources, resolveCitation } from './citations';
 import {
 	CONNECTION_STORAGE_KEY,
 	loadConnection,
@@ -14,7 +15,7 @@ import {
 	forgetConnection,
 } from './connection';
 import { MAX_TOOL_CALLS, validateConnection } from './types';
-import type { CoachEvent, Snapshot } from './types';
+import type { CoachEvent, Snapshot, Source } from './types';
 
 const snapshot: Snapshot = {
 	sessionId: 'game-a',
@@ -325,6 +326,7 @@ test('Pi faux provider performs real shell research before explaining with a sou
 	faux.setResponses([
 		fauxAssistantMessage(
 			[
+				{ type: 'text', text: 'I will check the borrowing rules.' },
 				fauxToolCall('bash', {
 					command: 'grep -n leverage /docs/help/001.txt; wsr player',
 				}),
@@ -363,6 +365,131 @@ test('Pi faux provider performs real shell research before explaining with a sou
 		events.some(
 			(event) => event.type === 'text' && event.text.includes('[Borrowing]'),
 		),
+	);
+	const textEvents = events.filter((event) => event.type === 'text');
+	assert.ok(textEvents.some((event) => event.status === 'streaming'));
+	const completed = textEvents.filter((event) => event.status === 'complete');
+	assert.equal(completed.length, 2);
+	assert.notEqual(completed[0].id, completed[1].id);
+	assert.ok(
+		events.indexOf(completed[0]) <
+			events.findIndex(
+				(event) => event.type === 'tool' && event.entry.status === 'running',
+			),
+		'An assistant message completes before its tool calls begin.',
+	);
+});
+
+test('Pi settles partial messages on provider errors and aborts', async () => {
+	for (const stopReason of ['error', 'aborted'] as const) {
+		const faux = createFauxCore({ tokensPerSecond: 100000 });
+		faux.setResponses([
+			fauxAssistantMessage('**Partial explanation', {
+				stopReason,
+				errorMessage: 'Interrupted.',
+			}),
+		]);
+		const events: CoachEvent[] = [];
+		const { agent } = createCoachAgent({
+			model: faux.getModel(),
+			streamFn: faux.streamSimple,
+			snapshot,
+			history: [],
+			exec: async () => {
+				throw new Error('No research expected.');
+			},
+			emit: (event) => events.push(event),
+		});
+		await agent.prompt('Explain debt.');
+		const last = events.findLast((event) => event.type === 'text');
+		assert.ok(last?.type === 'text');
+		assert.equal(last.text, '**Partial explanation');
+		assert.equal(last.status, stopReason === 'aborted' ? 'stopped' : 'error');
+	}
+});
+
+test('citations require exact retrieved source paths and valid line fragments', () => {
+	const source: Source = {
+		path: '/docs/help/debt-abcd.txt',
+		title: 'Debt',
+		text: 'Use debt carefully.',
+		mode: 'help',
+	};
+	const sources = [source];
+	const allowed = [source.path];
+	assert.deepEqual(resolveCitation(`${source.path}#L3-L5`, sources, allowed), {
+		source,
+		line: 3,
+	});
+	assert.deepEqual(resolveCitation(source.path, sources, allowed), {
+		source,
+		line: 1,
+	});
+	assert.equal(resolveCitation(source.path, sources, []), undefined);
+	assert.equal(
+		resolveCitation('/docs/help/missing.txt', sources, allowed),
+		undefined,
+	);
+	for (const href of [
+		`https://example.org${source.path}`,
+		`/${source.path}`,
+		`${source.path}?x=1`,
+		`${source.path}#L0`,
+		`${source.path}#L5-L3`,
+		`${source.path}#L3-`,
+		`${source.path}#L9999999999999999999999`,
+		'streamdown:incomplete-link',
+		'javascript:alert(1)',
+	])
+		assert.equal(resolveCitation(href, sources, allowed), undefined, href);
+	assert.deepEqual(
+		citationSources(
+			[
+				{
+					type: 'paragraph',
+					raw: '',
+					text: '',
+					tokens: [
+						{
+							type: 'link',
+							raw: '',
+							text: 'Debt',
+							href: `${source.path}#L3`,
+							tokens: [],
+						},
+						{
+							type: 'link',
+							raw: '',
+							text: 'Debt again',
+							href: source.path,
+							tokens: [],
+						},
+					],
+				},
+			],
+			sources,
+			allowed,
+		),
+		[source],
+	);
+	assert.deepEqual(
+		citationSources(
+			[
+				{
+					type: 'code',
+					raw: `[Debt](${source.path})`,
+					text: `[Debt](${source.path})`,
+				},
+				{
+					type: 'codespan',
+					raw: `[Debt](${source.path})`,
+					text: `[Debt](${source.path})`,
+				},
+			],
+			sources,
+			allowed,
+		),
+		[],
 	);
 });
 

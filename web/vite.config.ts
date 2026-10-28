@@ -17,6 +17,7 @@ export default defineConfig({
 	optimizeDeps: {
 		include: [
 			'@shadcn-svelte/primitives/message-scroller',
+			'svelte-streamdown',
 			'@earendil-works/pi-agent-core',
 			'@earendil-works/pi-ai/api/openai-completions',
 			'typebox',

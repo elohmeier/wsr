@@ -72,7 +72,8 @@ inspect a frozen snapshot of player-visible state. Retrieved excerpts and querie
 visible state go to your provider; full saves, raw globals, other human players'
 private finances and unrevealed events are excluded. Its tools are read-only.
 
-The ticker pauses while the coach is open. Source citations open local documents;
+The ticker pauses while the coach is open. Replies render Markdown as they arrive,
+including lists, tables and code blocks. Source citations open local documents;
 **Inspection details** shows tool commands and output. **Add tutorial** imports
 a local text, Markdown or HTML file for this session. **Stop** cancels a response.
 Starting or loading a game, or changing players, clears the conversation.

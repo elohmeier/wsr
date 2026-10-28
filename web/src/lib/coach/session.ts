@@ -218,7 +218,20 @@ export function createCoachAgent(options: {
 				.filter((part) => part.type === 'text')
 				.map((part) => part.text)
 				.join('');
-			if (text) options.emit({ type: 'text', id: messageId, text });
+			if (text)
+				options.emit({
+					type: 'text',
+					id: messageId,
+					text,
+					status:
+						event.type === 'message_update'
+							? 'streaming'
+							: event.message.stopReason === 'aborted'
+								? 'stopped'
+								: event.message.stopReason === 'error'
+									? 'error'
+									: 'complete',
+				});
 		}
 		if (event.type === 'tool_execution_start') {
 			options.emit({

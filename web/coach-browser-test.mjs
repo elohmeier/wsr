@@ -67,6 +67,7 @@ async function checkMobileCoach(width, height) {
 }
 const requests = [];
 const sockets = new Set();
+let advanceMarkdown;
 const server = createServer(async (request, response) => {
 	response.setHeader('Access-Control-Allow-Origin', new URL(url).origin);
 	response.setHeader('Access-Control-Allow-Headers', '*');
@@ -104,7 +105,7 @@ const server = createServer(async (request, response) => {
 		return;
 	}
 	if (question.includes('stop this response')) {
-		send({ content: 'This response can be stopped.' });
+		send({ content: 'This response can be stopped.\n\n**Unfinished explanation' });
 		return;
 	}
 	if (question.includes('long explanation')) {
@@ -122,6 +123,8 @@ const server = createServer(async (request, response) => {
 		.slice(lastUser + 1)
 		.find((message) => message.role === 'tool');
 	if (!tool) {
+		if (question.includes('progressive markdown'))
+			send({ content: 'Checking the sources before explaining.\n\n' });
 		send({
 			tool_calls: [
 				{
@@ -173,7 +176,24 @@ const server = createServer(async (request, response) => {
 			});
 			send({}, 'tool_calls');
 		} else {
-			send({ content: reply });
+			if (question.includes('progressive markdown')) {
+				// The test advances each chunk after inspecting the intermediate DOM.
+				const chunk = (content) => new Promise((resolve) => {
+					advanceMarkdown = resolve;
+					send({ content });
+				});
+				await chunk('## Risk review\n\n**Debt risk');
+				await chunk(`**. [Streaming tutorial](${path}#L3`);
+				await chunk('-L3)\n\n- Inspect cash\n  - Compare debt\n\n1. Review exposure\n2. Keep a buffer\n\n> Check the source.\n\nStreaming tail');
+				const headers = Array.from({ length: 18 }, (_, i) => `Measure ${i + 1}`);
+				await chunk(' continues.\n\n' +
+					`| ${headers.join(' | ')} |\n| ${headers.map(() => '---').join(' | ')} |\n| ${headers.map(() => '$100').join(' | ')} |\n\n` +
+					`\x60\x60\x60text\n[Example citation](${path}#L3)\n${'long_code_value_'.repeat(30)}\n\x60\x60\x60\n\n` +
+					'Cash is $10 million and debt is $20 million. Literal $x + y$.\n\n' +
+					'[Unread document](/docs/help/not-read.txt#L3) and [External](https://example.invalid/markdown-probe).\n\n' +
+					'![Remote image](https://example.invalid/markdown-probe.png) ![Local image](/markdown-probe.png)\n\n' +
+					'<script>window.coachMarkdownInjection=1</script><img src="/markdown-probe.png"><iframe src="/markdown-probe"></iframe>\n\nMarkdown complete.');
+			} else send({ content: reply });
 			send({}, 'stop');
 		}
 	}
@@ -299,10 +319,54 @@ try {
 	await click('[aria-label="Jump to latest"]');
 	await wait('coachViewport.scrollTop>500');
 	console.log('Coach browser: verified streaming scroll and Jump to latest.');
+	await fill('#coach-question', 'Check progressive markdown using my tutorial.');
+	await button('Send');
+	await wait("document.querySelector('.coach-markdown[data-message-status=\"streaming\"] strong')?.textContent === 'Debt risk'");
+	assert.ok(await evaluate("[...document.querySelectorAll('.coach-markdown[data-message-status=\"complete\"]')].some(e=>e.textContent.includes('Checking the sources'))"),
+		'An assistant message before a tool call must finish while the final answer streams.');
+	advanceMarkdown();
+	await wait("document.querySelector('.coach-markdown[data-message-status=\"streaming\"]')?.textContent.includes('Streaming tutorial')");
+	assert.equal(await evaluate("document.querySelectorAll('.coach-markdown[data-message-status=\"streaming\"] .coach-citation').length"), 0,
+		'A partial citation URL must stay inactive.');
+	advanceMarkdown();
+	await wait("!!document.querySelector('.coach-markdown[data-message-status=\"streaming\"] .coach-citation')");
+	await evaluate(`window.coachMarkdown=document.querySelector('.coach-markdown[data-message-status="streaming"]');
+		window.coachCitation=coachMarkdown.querySelector('.coach-citation');coachCitation.focus();
+		window.coachHeading=coachMarkdown.querySelector('h2');
+		const range=document.createRange();range.selectNodeContents(coachHeading);
+		getSelection().removeAllRanges();getSelection().addRange(range)`);
+	advanceMarkdown();
+	await wait("document.querySelector('.coach-markdown[data-message-status=\"streaming\"]')?.textContent.includes('Markdown complete.')");
+	assert.ok(await evaluate("coachMarkdown.querySelector('h2')===coachHeading && document.activeElement===coachCitation && getSelection().toString()==='Risk review'"),
+		'Appending blocks must preserve existing nodes, citation focus and selection.');
+	advanceMarkdown();
+	await wait("!document.querySelector('[aria-label=\"Stop response\"]')");
+	assert.ok(await evaluate("coachMarkdown.dataset.messageStatus==='complete' && document.activeElement===coachCitation && getSelection().toString()==='Risk review'"),
+		'Completion must preserve focus and selection without replacing the block tree.');
+	assert.ok(await evaluate("!!coachMarkdown.querySelector('ul ul') && coachMarkdown.querySelectorAll('ol > li').length===2 && !!coachMarkdown.querySelector('blockquote') && !!coachMarkdown.querySelector('table') && coachMarkdown.querySelector('pre code').textContent.includes('[Example citation]')"));
+	assert.ok(await evaluate("coachMarkdown.textContent.includes('Cash is $10 million and debt is $20 million. Literal $x + y$.')"),
+		'Dollar amounts and math-like text must retain their literal characters.');
+	assert.equal(await evaluate("coachMarkdown.querySelectorAll('.coach-citation').length"), 1,
+		'Code examples and unrecognized links must not become citations.');
+	assert.equal(await evaluate("coachMarkdown.querySelectorAll('a,img,script,iframe').length"), 0);
+	assert.ok(!(await evaluate('window.coachMarkdownInjection')));
+	assert.equal(await evaluate("performance.getEntriesByType('resource').filter(e=>e.name.includes('markdown-probe')).length"), 0,
+		'Rendered Markdown must not fetch images or frames.');
+	assert.ok(await evaluate("coachMarkdown.parentElement.textContent.includes('Sources · 1')"));
+	await evaluate('getSelection().removeAllRanges()');
+	await checkMobileCoach(390, 844);
+	await evaluate("window.coachMarkdown=[...document.querySelectorAll('.coach-markdown')].find(e=>e.textContent.includes('Markdown complete.'))");
+	assert.ok(await evaluate("coachMarkdown.querySelector('[data-streamdown-table]').scrollWidth > coachMarkdown.querySelector('[data-streamdown-table]').clientWidth"),
+		'A wide table must scroll within the message on mobile.');
+	await browser('set', 'viewport', '1440', '1000');
+	await wait("!!document.querySelector('.coach-dock')");
+	console.log('Coach browser: progressive Markdown, citations, literal dollars, inert HTML/images, stable focus/selection and mobile tables passed.');
 	await fill('#coach-question', 'stop this response');
 	await button('Send');
-	await wait('!!document.querySelector(\'[aria-label="Stop response"]\')');
+	await wait("document.querySelector('.coach-markdown[data-message-status=\"streaming\"] strong')?.textContent === 'Unfinished explanation'");
 	await click('[aria-label="Stop response"]');
+	assert.ok(await evaluate("document.querySelector('.coach-markdown[data-message-status=\"stopped\"] strong')?.textContent === 'Unfinished explanation'"),
+		'Stop must settle the message while retaining readable partial formatting.');
 	assert.ok(
 		!(await evaluate(
 			'!!document.querySelector(\'[aria-label="Stop response"]\')',
