@@ -1,0 +1,45 @@
+# Dev environment: `mise install` sets up Python + uv; `mise run setup` creates .venv with the emulator
+# harness dependencies (tools/emu/requirements.txt). The Rust differential tests use .venv/bin/python.
+[tools]
+python = "3.15"
+uv = "latest"
+"aqua:nextest-rs/nextest/cargo-nextest" = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+
+[tasks.setup]
+description = "Install the emulator harness dependencies into .venv"
+run = "uv pip install -q -r tools/emu/requirements.txt"
+
+[tasks.test]
+description = "Run public tests using synthetic resources; no original files required"
+dir = "engine"
+run = "cargo nextest run --no-fail-fast --test-threads 4"
+
+[tasks.test.env]
+WSR_SEED_THREADS = "4"
+WSR_EMU_CACHE_MB = "20000"
+
+[tasks.test-campaign]
+description = "Validate the independent campaign comparator and require the original emulator integration"
+depends = ["content"]
+run = 'WSR_CONTENT_PACK="$PWD/engine/target/owner-content.pack" python -I tools/emu/test_campaign.py --integration'
+
+[tasks.content]
+description = "Extract private runtime resources for original-engine comparisons"
+run = "node web/extract-content.mjs extracted/app engine/target/owner-content.pack"
+
+[tasks.test-strict]
+description = "Require the original executable and complete every selected differential comparison"
+depends = ["content"]
+dir = "engine"
+run = '''
+python ../tools/test_emu_args.py
+WSR_CONTENT_PACK="$PWD/target/owner-content.pack" cargo nextest run --all-features --no-fail-fast --test-threads 4
+'''
+
+[tasks.test-strict.env]
+WSR_REQUIRE_ORIGINAL = "1"
+WSR_SEED_THREADS = "4"
+WSR_EMU_CACHE_MB = "20000"

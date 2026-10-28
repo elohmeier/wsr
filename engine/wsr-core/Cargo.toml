@@ -1,0 +1,260 @@
+[package]
+name = "wsr-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Wall Street Raider engine (port of the WSR.EXE game logic), UI- and OS-independent"
+
+autotests = false
+
+[features]
+original-tests = []
+
+[dependencies]
+
+[[test]]
+name = "advice"
+path = "tests/advice.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "ai_player"
+path = "tests/ai_player.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "assets"
+path = "tests/assets.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "cashflow"
+path = "tests/cashflow.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "commod_ai"
+path = "tests/commod_ai.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "content"
+path = "tests/content.rs"
+
+[[test]]
+name = "control"
+path = "tests/control.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "corp_ai"
+path = "tests/corp_ai.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "corp_finance"
+path = "tests/corp_finance.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "desk_callbacks"
+path = "tests/desk_callbacks.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "diff_compare"
+path = "tests/diff_compare.rs"
+
+[[test]]
+name = "diff_harness"
+path = "tests/diff_harness.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "diff_holdings"
+path = "tests/diff_holdings.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "diff_report"
+path = "tests/diff_report.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "diff_save"
+path = "tests/diff_save.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "earnings"
+path = "tests/earnings.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "economy"
+path = "tests/economy.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "etf_derivs"
+path = "tests/etf_derivs.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "events"
+path = "tests/events.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "ext80"
+path = "tests/ext80.rs"
+
+[[test]]
+name = "extensions"
+path = "tests/extensions.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "finance"
+path = "tests/finance.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "format"
+path = "tests/format.rs"
+
+[[test]]
+name = "futures"
+path = "tests/futures.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "info_screens"
+path = "tests/info_screens.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "market"
+path = "tests/market.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "newgame"
+path = "tests/newgame.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "newgame_helpers"
+path = "tests/newgame_helpers.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "news"
+path = "tests/news.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "numfmt"
+path = "tests/numfmt.rs"
+
+[[test]]
+name = "options"
+path = "tests/options.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "outlook"
+path = "tests/outlook.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "real"
+path = "tests/real.rs"
+
+[[test]]
+name = "report"
+path = "tests/report.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "report_actions"
+path = "tests/report_actions.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "reports_corp"
+path = "tests/reports_corp.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "reports_lists"
+path = "tests/reports_lists.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "research"
+path = "tests/research.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "restructure"
+path = "tests/restructure.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "rng"
+path = "tests/rng.rs"
+
+[[test]]
+name = "safety"
+path = "tests/safety.rs"
+
+[[test]]
+name = "save_roundtrip"
+path = "tests/save_roundtrip.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "shell"
+path = "tests/shell.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "shorts"
+path = "tests/shorts.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "sim_entity"
+path = "tests/sim_entity.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "string"
+path = "tests/string.rs"
+
+[[test]]
+name = "swaps"
+path = "tests/swaps.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "trade_screens"
+path = "tests/trade_screens.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "trading"
+path = "tests/trading.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "turn"
+path = "tests/turn.rs"
+required-features = ["original-tests"]
+
+[[test]]
+name = "valuation"
+path = "tests/valuation.rs"
+required-features = ["original-tests"]

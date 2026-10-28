@@ -1,0 +1,17 @@
+# Copyrighted game files (Ronin Software) — keep out of git
+*.exe
+*.dll
+*.pack
+/extracted
+decoded/
+ghidra-proj/
+decompiled/
+engine/target/
+web/wsr.wasm
+__pycache__/
+.venv/
+web/node_modules/
+web/dist/
+
+# Generated runtime content belongs only in local storage or ignored test output
+ENGINE-CONTENT.WSR

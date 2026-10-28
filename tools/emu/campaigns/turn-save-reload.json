@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "description": "Independent ticker trajectories with a save/reload and a player handoff. Each engine reloads its own bytes.",
+  "steps": [
+    {"op": "tick", "repeat": 32},
+    {"op": "save"},
+    {"op": "reload"},
+    {"op": "clock", "arg": 1},
+    {"op": "tick", "repeat": 32},
+    {"op": "end_turn"},
+    {"op": "clock", "arg": 1},
+    {"op": "tick", "repeat": 1600}
+  ]
+}

@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["wsr-core", "wsr-wasm"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = true
+
+# The differential tests serialise and compare ~400k-value states per call: build them optimised.
+[profile.test]
+opt-level = 2
+debug-assertions = true
+overflow-checks = true
+incremental = false
+# test binaries are many and large; line tables suffice for backtraces
+debug = "line-tables-only"
+
+[profile.dev]
+incremental = false
+debug = "line-tables-only"

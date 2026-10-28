@@ -1,0 +1,62 @@
+name: Public checks and optional Pages deployment
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy_pages:
+        description: Deploy the checked build to GitHub Pages
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - run: rustup default 1.99.0
+      - run: python3 tools/generate_content_schema.py --check
+      - run: python3 tools/audit_content.py
+      - run: cargo test --manifest-path engine/Cargo.toml --workspace --locked
+      - run: npm --prefix web ci --ignore-scripts
+      - run: npm --prefix web run check
+      - run: npm --prefix web run test:client
+      - run: npm --prefix web run test:content
+      - run: npm --prefix web run test:coach
+      - run: npm --prefix web run build
+      - run: python3 tools/audit_content.py --artifacts web/dist
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy_pages
+        with:
+          path: web/dist
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
