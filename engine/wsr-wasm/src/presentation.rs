@@ -10,6 +10,48 @@ use wsr_core::pb::pbstr::PbStr;
 fn js(s: &PbStr) -> String {
     json_str(&s.to_display())
 }
+
+pub fn form_json(form: &wsr_core::ui::Form) -> String {
+    serde_json::json!({
+        "title": form.title.to_display(),
+        "prompt": form.prompt.iter().map(PbStr::to_display).collect::<Vec<_>>(),
+        "fields": form.fields.iter().map(|f| serde_json::json!({
+            "id": f.id, "label": f.label.to_display(), "value": f.value.to_display(),
+            "hint": f.hint.to_display(), "numeric": f.numeric, "min": f.min, "max": f.max,
+            "minLength": f.min_length, "maxLength": f.max_length,
+            "choices": f.choices.iter().map(|(value, label)| serde_json::json!({
+                "value": value.to_display(), "label": label.to_display()
+            })).collect::<Vec<_>>(), "refreshOnChange": f.refresh_on_change
+        })).collect::<Vec<_>>(),
+        "buttons": form.buttons.iter().map(|(id, label)| serde_json::json!({
+            "id": id, "label": label.to_display()
+        })).collect::<Vec<_>>()
+    }).to_string()
+}
+
+/// i32 callback id followed by u32-length-prefixed CP1252 fields. Reject incomplete,
+/// oversized or unexpected packets as a close; never execute a partial submission.
+pub fn form_response(bytes: &[u8], form: &wsr_core::ui::Form) -> wsr_core::ui::FormResponse {
+    fn parse(bytes: &[u8], form: &wsr_core::ui::Form) -> Option<wsr_core::ui::FormResponse> {
+        let button = i32::from_le_bytes(bytes.get(..4)?.try_into().ok()?);
+        if button != 0 && !form.buttons.iter().any(|(id, _)| *id == button) { return None; }
+        let mut p = 4;
+        let mut values = Vec::new();
+        for field in &form.fields {
+            let len = u32::from_le_bytes(bytes.get(p..p + 4)?.try_into().ok()?) as usize;
+            p += 4;
+            if len > 4096 { return None; }
+            let mut value = bytes.get(p..p + len)?.to_vec();
+            p += len;
+            if let Some(max) = field.max_length { value.truncate(max); }
+            values.push(PbStr(value));
+        }
+        (p == bytes.len()).then_some(wsr_core::ui::FormResponse { button, values })
+    }
+    parse(bytes, form).unwrap_or_else(|| wsr_core::ui::FormResponse {
+        button: -1, values: form.fields.iter().map(|f| f.value.clone()).collect()
+    })
+}
 /// Undo the original chart's drawing-only scale and GDP translation.
 /// Empty months and invalid numbers are omitted rather than plotted as zero.
 pub fn chart_history_json(spec: &wsr_core::logic::info_screens::chart::ChartSpec) -> String {
@@ -133,6 +175,27 @@ mod tests {
 use wsr_core::pb::real::{Ext, cast};
 
     use super::*;
+    #[test]
+    fn form_packets_preserve_empty_fields_and_reject_partial_submissions() {
+        use wsr_core::ui::{Form, FormField};
+        let form = Form {
+            fields: vec![FormField { max_length: Some(20), ..Default::default() }, FormField::default()],
+            buttons: vec![(1, PbStr::from("OK"))], ..Default::default()
+        };
+        let mut bytes = 1i32.to_le_bytes().to_vec();
+        bytes.extend_from_slice(&21u32.to_le_bytes());
+        bytes.extend_from_slice(b"123456789012345678901");
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        let response = form_response(&bytes, &form);
+        assert_eq!(response.button, 1);
+        assert_eq!(response.values, vec![PbStr::from("12345678901234567890"), PbStr::new()]);
+        bytes.pop();
+        assert_eq!(form_response(&bytes, &form).button, -1);
+        bytes.extend_from_slice(&[0, 0]);
+        assert_eq!(form_response(&bytes, &form).button, -1);
+        bytes[..4].copy_from_slice(&999i32.to_le_bytes());
+        assert_eq!(form_response(&bytes, &form).button, -1);
+    }
     #[test]
     fn chart_history_restores_units_and_negative_growth_without_filling_empty_months() {
         crate::install_test_content();

@@ -78,7 +78,35 @@ fn str_t(x: Ext, digits: u32) -> PbStr {
 /// is off, " [runtime resource wording] " (NO → return, else `BankAllocOff = 0`). The user's actions
 /// come from [`bank_alloc_next_action`]; see [`show_dlg_bank_asset_alloc_with`].
 pub fn show_dlg_bank_asset_alloc(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, h_parent: i32) {
-    show_dlg_bank_asset_alloc_with(g, ui, rng, h_parent, &mut bank_alloc_next_action);
+    let Some(mut dlg) = bank_alloc_open(g, ui, h_parent) else { return; };
+    let content = crate::content::current();
+    while dlg.open {
+        use crate::ui::{Form, FormField};
+        let form = Form {
+            title: s(BANK_ALLOC_DLG_TITLE(&content)),
+            prompt: vec![s(BANK_ALLOC_INSTRUCTIONS(&content)), s(content.string(11256)) + &dlg.total],
+            fields: (0..5).map(|k| FormField {
+                id: BANK_ALLOC_FIELD_IDS[k], label: s(BANK_ALLOC_LABELS(&content)[k]) + " (%)",
+                value: dlg.fields[k].clone(), numeric: true, ..Default::default()
+            }).collect(),
+            buttons: vec![(BANK_ALLOC_UPDATE_ID, s(content.string(11253))),
+                (BANK_ALLOC_APPLY_ID, s("Apply")), (BANK_ALLOC_CANCEL_ID, s("Cancel")),
+                (BANK_ALLOC_TURN_OFF_ID, s(content.string(11254)))],
+        };
+        let action = if let Some(response) = ui.form(&form) {
+            if response.values.len() != 5 { BankAllocAction::Close } else {
+                for (field, value) in dlg.fields.iter_mut().zip(response.values) { *field = value; }
+                match response.button {
+                    BANK_ALLOC_UPDATE_ID => BankAllocAction::UpdateTotal,
+                    BANK_ALLOC_APPLY_ID => BankAllocAction::Apply,
+                    BANK_ALLOC_CANCEL_ID => BankAllocAction::Cancel,
+                    BANK_ALLOC_TURN_OFF_ID => BankAllocAction::TurnOff,
+                    _ => BankAllocAction::Close,
+                }
+            }
+        } else { bank_alloc_next_action(ui, &dlg) };
+        bank_alloc_dispatch(g, ui, rng, &mut dlg, action);
+    }
 }
 
 /// [`show_dlg_bank_asset_alloc`] with the user's actions taken from `next` (the modal loop of

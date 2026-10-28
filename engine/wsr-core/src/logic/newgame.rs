@@ -354,6 +354,8 @@ impl Ng<'_> {
         // DIALOG SHOW STATE hDlgMain, 0 / 5 around the startup dialog (UI)
         if let Some(cfg) = show_startup_dialog(self.g, self.ui, self.rng) {
             self.written.push(("cfig.wsr".into(), cfg));
+        } else {
+            return;
         }
         self.f.reply = 7;
         if self.g.cfg_difficulty_raw == 4 {
@@ -1914,11 +1916,9 @@ pub fn in_box_num_players(g: &mut Globals, ui: &mut dyn Ui) {
 /// years, default `CfgGameLengthYears` or 999; over 35 asks to confirm the disqualified score) and
 /// difficulty (1..4, default `DifficultyLevel`, set to 2 if 0).
 ///
-/// Each OK click is modelled as one [`Ui::inputbox`] per text box in the dialog's order (prompt = the box's
-/// label and range hint, title = the dialog title, default = the box's current text); the answers become
-/// the boxes' texts and Startup_OkBtn validates them like the original (stopping at the first invalid box
-/// with its message; state it already set stays). An empty answer closes the dialog (window close button)
-/// without running the OK handler.
+/// Interactive hosts show one [`Ui::form`] containing every text box. Scripted hosts retain the
+/// inputbox fallback. Invalid submissions preserve every field, including the corrected length
+/// after declining a long game. Closing the form is distinct from submitting an empty field.
 ///
 /// Returns the contents of `cfig.wsr` that SaveConfig wrote when OK ended the dialog (None if closed).
 pub fn show_startup_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng) -> Option<Vec<u8>> {
@@ -1970,12 +1970,35 @@ pub fn show_startup_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng) -> O
     boxes.push((356, st(__content.string(6722)), level));
     let title = st(__content.string(6723));
     loop {
-        for b in boxes.iter_mut() {
-            let a = ui.inputbox(&b.1, &title, &b.2);
-            if a.is_empty() {
-                return None; // dialog closed
+        use crate::ui::{Form, FormField};
+        let form = Form {
+            title: title.clone(),
+            fields: boxes.iter().map(|(id, label, value)| {
+                let name = *id <= 350;
+                FormField {
+                    id: *id, label: label.clone(), value: value.clone(),
+                    min_length: name.then_some(5), max_length: name.then_some(20),
+                    numeric: !name,
+                    min: match id { 352 => Some(100), 354 | 356 => Some(1), _ => None },
+                    max: match id { 352 => Some(1000), 354 => Some(999), 356 => Some(4), _ => None },
+                    ..Default::default()
+                }
+            }).collect(),
+            buttons: vec![(1, st("OK")), (-1, st("Cancel"))],
+            ..Default::default()
+        };
+        if let Some(response) = ui.form(&form) {
+            if response.button != 1 || response.values.len() != boxes.len() { return None; }
+            for (b, mut value) in boxes.iter_mut().zip(response.values) {
+                if b.0 <= 350 { value.0.truncate(20); }
+                b.2 = value;
             }
-            b.2 = a;
+        } else {
+            for b in boxes.iter_mut() {
+                let a = ui.inputbox(&b.1, &title, &b.2);
+                if a.is_empty() { return None; }
+                b.2 = a;
+            }
         }
         let text = |id: i32| {
             boxes

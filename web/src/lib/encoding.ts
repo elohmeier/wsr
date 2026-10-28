@@ -9,19 +9,24 @@ export function cp1252(text: string) {
 	);
 }
 export const cleanLabel = (text: string) => text.replaceAll('&', '');
+export function fieldsPacket(values: string[]) {
+	const fields = values.map((value) =>
+		cp1252(value == null ? '' : String(value)),
+	);
+	const bytes = new Uint8Array(fields.reduce((n, f) => n + 4 + f.length, 0));
+	const view = new DataView(bytes.buffer);
+	let p = 0;
+	for (const field of fields) {
+		view.setUint32(p, field.length, true);
+		bytes.set(field, p + 4);
+		p += 4 + field.length;
+	}
+	return bytes;
+}
 export function gridPacket(
 	rows: { side: string; strike: string; expiry: string; quantity: string }[],
 ) {
-	const fields = rows.flatMap((row) =>
-		[row.side, row.strike, row.expiry, row.quantity].map(cp1252),
+	return fieldsPacket(
+		rows.flatMap((row) => [row.side, row.strike, row.expiry, row.quantity]),
 	);
-	const bytes = new Uint8Array(fields.reduce((n, f) => n + 4 + f.length, 0)),
-		view = new DataView(bytes.buffer);
-	let p = 0;
-	for (const f of fields) {
-		view.setUint32(p, f.length, true);
-		bytes.set(f, p + 4);
-		p += 4 + f.length;
-	}
-	return bytes;
 }

@@ -118,9 +118,34 @@ export interface GridRow {
 	quantity: string;
 	price: string;
 }
+export interface FormField {
+	id: number;
+	label: string;
+	value: string;
+	hint: string;
+	numeric: boolean;
+	min: number | null;
+	max: number | null;
+	minLength: number | null;
+	maxLength: number | null;
+	choices: { value: string; label: string }[];
+	refreshOnChange: boolean;
+}
 export type UIRequest = { token: number; title: string } & (
 	| { kind: 'msgbox'; text: string; style: number }
 	| { kind: 'inputbox'; prompt: string; value: string }
+	| {
+			kind: 'symbolInput';
+			prompt: string;
+			value: string;
+			companies: { id: number; name: string; symbol: string }[];
+	  }
+	| {
+			kind: 'form';
+			prompt: string[];
+			fields: FormField[];
+			buttons: { id: number; label: string }[];
+	  }
 	| { kind: 'choose'; prompt: string[]; options: string[] }
 	| {
 			kind: 'report';

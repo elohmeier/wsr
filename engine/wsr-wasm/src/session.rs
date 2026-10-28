@@ -33,6 +33,8 @@ impl Ui for FileUi<'_> {
     fn high_score(&mut self, path: &PbStr, name: &PbStr, score: i64) -> i32 { self.inner.high_score(path, name, score) }
     fn msgbox(&mut self, text: &PbStr, style: i32, title: &PbStr) -> i32 { self.inner.msgbox(text, style, title) }
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr { self.inner.inputbox(prompt, title, default) }
+    fn form(&mut self, form: &wsr_core::ui::Form) -> Option<wsr_core::ui::FormResponse> { self.inner.form(form) }
+    fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, companies: &[wsr_core::ui::SymbolChoice]) -> PbStr { self.inner.symbol_input(prompt, title, default, companies) }
     fn report(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool) -> ReportAction { self.inner.report(title, lines, yes_no) }
     fn report_with_actions(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool, options: &wsr_core::ui::ReportOptions) -> ReportAction { self.inner.report_with_actions(title, lines, yes_no, options) }
     fn news(&mut self, headline: &PbStr) { self.inner.news(headline); }

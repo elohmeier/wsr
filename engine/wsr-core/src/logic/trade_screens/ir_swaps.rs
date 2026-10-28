@@ -186,6 +186,48 @@ pub fn show_ir_swap_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, _h_p
     g.dlg_open_swap_dlg = 1;
     let title = ir_swap_dialog_title(g);
     while form.open {
+        use crate::ui::{Form, FormField};
+        let edits = [IrSwapControl::Notional, IrSwapControl::StartQtr, IrSwapControl::StartYear,
+            IrSwapControl::EndQtr, IrSwapControl::EndYear];
+        let mut fields = vec![
+            FormField { id: 980, label: s("Rate type"), value: g.swap_rate_type.clone(),
+                choices: vec![(s("L"), IrSwapControl::LongBondRate.label(g)),
+                    (s("S"), IrSwapControl::ShortBondRate.label(g)), (s("P"), IrSwapControl::PrimeRate.label(g))],
+                refresh_on_change: true, ..Default::default() },
+            FormField { id: 986, label: s("Position"), value: g.swap_position.clone(),
+                choices: vec![(s(""), s("Choose a position")), (s("LONG"), IrSwapControl::Long.label(g)),
+                    (s("SHORT"), IrSwapControl::Short.label(g))], ..Default::default() },
+        ];
+        for ctrl in edits {
+            let value = ctrl.field(&mut form).unwrap().clone();
+            fields.push(FormField { id: ctrl.id(), label: ctrl.label(g), value, numeric: true, ..Default::default() });
+        }
+        let content = crate::content::current();
+        let spec = Form {
+            title: title.clone(),
+            prompt: vec![s(content.string(11423)), s(content.string(11425)) + &form.current_rate,
+                s(content.string(11428))], fields,
+            buttons: [IrSwapControl::Offer, IrSwapControl::Info, IrSwapControl::ViewSwaps,
+                IrSwapControl::Terminate, IrSwapControl::Exit].map(|ctrl| (ctrl.id(), ctrl.label(g))).to_vec(),
+        };
+        if let Some(response) = ui.form(&spec) {
+            if response.button == -1 || response.values.len() != 7 { break; }
+            let rate = match response.values[0].as_bytes() {
+                b"L" => IrSwapControl::LongBondRate, b"S" => IrSwapControl::ShortBondRate,
+                _ => IrSwapControl::PrimeRate,
+            };
+            ir_swap_dialog_click(g, ui, rng, &mut form, rate);
+            if response.values[1] == "LONG" { ir_swap_sel_long(g); }
+            else if response.values[1] == "SHORT" { ir_swap_sel_short(g); }
+            else { g.swap_position = PbStr::new(); }
+            for (ctrl, value) in edits.into_iter().zip(response.values.into_iter().skip(2)) {
+                *ctrl.field(&mut form).unwrap() = value;
+            }
+            if let Some(ctrl) = IrSwapControl::ALL.into_iter().find(|c| c.id() == response.button) {
+                ir_swap_dialog_click(g, ui, rng, &mut form, ctrl);
+            }
+            continue;
+        }
         let prompt = ir_swap_dialog_prompt(g, &form);
         let options: Vec<PbStr> = IrSwapControl::ALL.iter().map(|c| c.label(g)).collect();
         let Some(k) = ui.choose(&title, &prompt, &options) else {

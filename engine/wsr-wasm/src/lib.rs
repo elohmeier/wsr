@@ -18,6 +18,8 @@ pub mod summary;
 pub mod observer;
 pub mod presentation;
 pub mod session;
+#[cfg(test)]
+mod dialog_tests;
 #[cfg(target_arch = "wasm32")]
 pub mod host;
 

@@ -95,6 +95,7 @@ served locally, supply your installer and a complete unfinished human-player sav
 ```sh
 node web/content-browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
 node web/browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
+node web/forms-browser-test.mjs wsr985.exe http://localhost:8899/
 node web/coach-browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
 ```
 

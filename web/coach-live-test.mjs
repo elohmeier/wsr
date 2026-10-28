@@ -104,7 +104,11 @@ try {
 				prompt:document.querySelector('[for=dlg-input]')?.textContent,
 				buttons:[...document.querySelectorAll('#dlg-buttons button')].map(b=>b.textContent)})`);
 			await evaluate('window.previousDialog=document.querySelector("#dlg")');
-			if (dialog.prompt) {
+			if (await evaluate('!!document.querySelector("[data-game-form]")')) {
+				for (const [id, value] of [[342, 'Coach Tester'], [344, 'Second Player'], [352, '500'], [354, '10'], [356, '2']])
+					await browser('fill', '#game-field-' + id, value);
+				await button('OK');
+			} else if (dialog.prompt) {
 				const value =
 					dialog.title === 'Number of players'
 						? '2'

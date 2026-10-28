@@ -32,6 +32,8 @@ unsafe extern "C" {
     fn host_chart(json: *const u8, len: usize) -> i32;
     fn host_diagram(json: *const u8, len: usize) -> i32;
     fn host_option_station(json: *const u8, len: usize) -> *mut u8;
+    fn host_form(json: *const u8, len: usize) -> *mut u8;
+    fn host_symbol_input(json: *const u8, len: usize) -> *mut u8;
 }
 
 /// Take ownership of a `[len: u32][bytes]` buffer allocated by the host via `wsr_alloc`.
@@ -89,6 +91,20 @@ impl Ui for HostUi {
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr {
         let (p, t, d) = (prompt.as_bytes(), title.as_bytes(), default.as_bytes());
         PbStr(take(unsafe { host_inputbox(p.as_ptr(), p.len(), t.as_ptr(), t.len(), d.as_ptr(), d.len()) }))
+    }
+    fn form(&mut self, form: &wsr_core::ui::Form) -> Option<wsr_core::ui::FormResponse> {
+        let json = crate::presentation::form_json(form);
+        let bytes = take(unsafe { host_form(json.as_ptr(), json.len()) });
+        Some(crate::presentation::form_response(&bytes, form))
+    }
+    fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, companies: &[wsr_core::ui::SymbolChoice]) -> PbStr {
+        let json = serde_json::json!({
+            "title": title.to_display(), "prompt": prompt.to_display(), "value": default.to_display(),
+            "companies": companies.iter().map(|c| serde_json::json!({
+                "id": c.id, "name": c.name.to_display(), "symbol": c.symbol.to_display()
+            })).collect::<Vec<_>>()
+        }).to_string();
+        PbStr(take(unsafe { host_symbol_input(json.as_ptr(), json.len()) }))
     }
     fn report(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool) -> ReportAction {
         self.report_with_actions(title, lines, yes_no, &ReportOptions::default())

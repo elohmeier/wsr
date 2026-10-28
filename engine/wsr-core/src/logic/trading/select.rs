@@ -339,8 +339,8 @@ fn lookup_symbol_clear(g: &mut Globals) {
 /// is cleared, `InputDlgTitle` too. With `ActionCode` "CHANGESYM" (or "GETDATA") a found company is
 /// selected (`SelectTargetCorp`).
 ///
-/// The dialog's LOOK UP button (SymbolEntry_LookUpBtn 0x41a79f, the alphabetical company list
-/// ShowCompanyListDialog 0x41ce26) is not offered: the port's host shows its own lists.
+/// Interactive hosts offer LOOK UP via [`Ui::symbol_input`], with the original BANKS/BONDS/CTRL
+/// filters. Selection still passes through `lookup_symbol`, keeping the trading validation intact.
 ///
 /// An empty answer of [`Ui::inputbox`] is the Cancel button: the `Ui` can't tell OK with an empty entry
 /// box from Cancel (the original then leaves `SymbolDlgText = ""` instead of `"Cancel"`).
@@ -377,7 +377,8 @@ pub fn in_box_symbol(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng) {
     let prompt = prompt_text + __content.string(6717);
     g.input_dlg_title = PbStr::new();
     g.symbol_dlg_open = 1;
-    let answer = ui.inputbox(&prompt, &dlg_title, &default_text);
+    let companies = symbol_lookup_choices(g);
+    let answer = ui.symbol_input(&prompt, &dlg_title, &default_text, &companies);
     if answer.is_empty() {
         // SymbolEntry_CancelBtn
         g.symbol_dlg_text = s("Cancel");
@@ -409,6 +410,21 @@ pub fn in_box_symbol(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng) {
         }
     }
     g.in_box_mode = 0;
+}
+
+/// ShowCompanyListDialog's active-company list (0x41ce26), sorted alphabetically by name.
+/// Building this list has no selection side effects; cancelling lookup preserves the entry.
+pub fn symbol_lookup_choices(g: &Globals) -> Vec<crate::ui::SymbolChoice> {
+    let mut choices: Vec<_> = (11..=1600).filter(|&id| {
+        g.entity_status[id] == 1
+            && (g.lookup_filter != "BANKS" || id < 86)
+            && (g.lookup_filter != "BONDS" || g.bonds_issued[id] >= 1)
+            && (g.lookup_filter != "CTRL" || g.corp_controller[id] == g.cur_player)
+    }).map(|id| crate::ui::SymbolChoice {
+        id, name: g.ent_name[id].clone(), symbol: g.ent_symbol[id].clone(),
+    }).collect();
+    choices.sort_by(|a, b| compare(a.name.as_bytes(), b.name.as_bytes()));
+    choices
 }
 
 /// CreateSymbolEntryDialog (0x419674): the symbol prefilled in the entry box (state effects included:

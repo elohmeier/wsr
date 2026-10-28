@@ -59,6 +59,46 @@ pub enum DialogKind {
     Report,
 }
 
+/// Editable controls of one original modal window. Hosts without forms use the existing
+/// scripted choice/input path; interactive hosts submit all controls together.
+#[derive(Clone, Debug, Default)]
+pub struct FormField {
+    pub id: i32,
+    pub label: PbStr,
+    pub value: PbStr,
+    pub hint: PbStr,
+    pub numeric: bool,
+    pub min: Option<i32>,
+    pub max: Option<i32>,
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
+    pub choices: Vec<(PbStr, PbStr)>,
+    pub refresh_on_change: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Form {
+    pub title: PbStr,
+    pub prompt: Vec<PbStr>,
+    pub fields: Vec<FormField>,
+    pub buttons: Vec<(i32, PbStr)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FormResponse {
+    /// -1 closes the window; other ids are callbacks from `Form::buttons` (0 refreshes fields).
+    pub button: i32,
+    /// Text in the same order as `Form::fields`, including empty fields.
+    pub values: Vec<PbStr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SymbolChoice {
+    pub id: i32,
+    pub name: PbStr,
+    pub symbol: PbStr,
+}
+
 pub trait Ui {
     /// Opt-in host policy: bound legacy random searches and validate load/save boundaries.
     /// Compatibility hosts retain the original behavior; browser sessions enable these guards.
@@ -88,6 +128,11 @@ pub trait Ui {
     fn msgbox(&mut self, text: &PbStr, style: i32, title: &PbStr) -> i32;
     /// `INPUTBOX$(prompt, title, default)` → entered text ("" on cancel).
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr;
+    fn form(&mut self, _form: &Form) -> Option<FormResponse> { None }
+    /// Symbol entry with the original LOOK UP list, already filtered by the engine.
+    fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, _companies: &[SymbolChoice]) -> PbStr {
+        self.inputbox(prompt, title, default)
+    }
     /// A text report (`TextLines()` + `ShowTextReport`): lines may carry `@C<id>`/`@I<id>` links.
     /// `yes_no`: the report asks a question and shows YES/NO buttons instead of OK.
     fn report(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool) -> ReportAction;
@@ -154,6 +199,8 @@ impl Ui for DialogUi<'_> {
     fn high_score(&mut self, path: &PbStr, name: &PbStr, score: i64) -> i32 { self.inner.high_score(path, name, score) }
     fn msgbox(&mut self, text: &PbStr, style: i32, title: &PbStr) -> i32 { self.inner.msgbox(text, style, title) }
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr { self.inner.inputbox(prompt, title, default) }
+    fn form(&mut self, form: &Form) -> Option<FormResponse> { self.inner.form(form) }
+    fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, companies: &[SymbolChoice]) -> PbStr { self.inner.symbol_input(prompt, title, default, companies) }
     fn report(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool) -> ReportAction { self.inner.report(title, lines, yes_no) }
     fn report_with_actions(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool, options: &ReportOptions) -> ReportAction { self.inner.report_with_actions(title, lines, yes_no, options) }
     fn news(&mut self, headline: &PbStr) { self.inner.news(headline); }

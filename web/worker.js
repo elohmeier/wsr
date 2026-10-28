@@ -42,6 +42,17 @@ const host = {
     ask({ kind: 'inputbox', prompt: str(p, n), title: str(t, tn), value: str(d, dn) });
     return toWasm(data.slice(0, ctrl[2]));
   },
+  host_symbol_input: (p, n) => {
+    ask({kind: 'symbolInput', ...readJson(p, n)});
+    return toWasm(data.slice(0, ctrl[2]));
+  },
+  host_form: (p, n) => {
+    const button = ask({kind: 'form', ...readJson(p, n)}), fields = data.slice(0, ctrl[2]);
+    const bytes = new Uint8Array(4 + fields.length);
+    new DataView(bytes.buffer).setInt32(0, button, true);
+    bytes.set(fields, 4);
+    return toWasm(bytes);
+  },
   host_report: (t, tn, p, n, yesNo, options = 0) => {
     const r = ask({ kind: 'report', title: str(t, tn), lines: str(p, n).split('\r\n'), yesNo: !!yesNo,
       analystRating: options & 1024 ? options & 7 : null, ratingTrade: !!(options & 256), stockChart: !!(options & 512) });

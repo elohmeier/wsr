@@ -163,7 +163,10 @@ try {
     if(!evaluate("!!document.querySelector('#dlg')"))break;
     const title=evaluate("document.querySelector('#dlg-title').textContent");
     evaluate("window.previousDialog=document.querySelector('#dlg')");
-    if(evaluate("!!document.querySelector('#dlg-input')")){
+    if(evaluate("!!document.querySelector('[data-game-form]')")){
+      for (const [id, value] of [[342,'Browser Alice'],[344,'Browser Bobby'],[352,'500'],[354,'1'],[356,'2']]) fill('#game-field-'+id,value);
+      button('OK');
+    }else if(evaluate("!!document.querySelector('#dlg-input')")){
       const prompt=evaluate("document.querySelector('[for=dlg-input]').textContent");
       const value=title==='Number of players'?'2':prompt.startsWith('Player 1')?'Browser Alice':prompt.startsWith('Player 2')?'Browser Bobby':prompt.startsWith('Game Length')?'1':prompt.startsWith('Difficulty')?'2':prompt.startsWith('Starting Money')?'500':null;
       if(value!==null)fill('#dlg-input',value);
