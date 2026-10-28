@@ -1,68 +1,85 @@
 # Browser host
 
-The Svelte interface runs the Rust engine in a Web Worker. A shared-memory bridge allows the engine to wait for modal UI replies. Build with `npm ci --ignore-scripts`, `npm run check` and `npm run build` in this directory. Rust's `wasm32-unknown-unknown` target is required.
+The Svelte interface runs the Rust/WASM engine in a Web Worker and stores imported
+resources and saves in IndexedDB. [Play on GitHub Pages](https://elohmeier.github.io/wsr/)
+or see the [project README](../README.md) for local setup and public checks.
+All commands below run from the repository root.
 
-## Local resources
+## Live development
 
-Import a supported installer in the browser. `installer.mjs` validates the installer container, temporarily reads the required binaries, then uses `content-manifest.json` to extract resource records. Only data files, documentation, bitmap resources and `ENGINE-CONTENT.WSR` are retained in IndexedDB. Extraction and game processing stay local; using the optional learning coach sends selected text and visible game information to your configured model provider.
+After installing dependencies with `npm --prefix web ci --ignore-scripts`:
 
-The catalog format is `WSRCP002`, a little-endian u32 record count, records of `(u32 id, u32 byte length, raw bytes)`, and a trailing CRC32 of the preceding bytes. IDs and the complete required set are shared with the Rust loader through a generated schema. Source-image SHA-256 hashes identify the supported binary version. Windows-1252 bytes are preserved. Catalog replacement is validated before the live catalog or stored file changes.
+```sh
+npm --prefix web run build:wasm
+npm --prefix web run dev
+```
 
-The manifest is extraction metadata. Assembly recipes combine local source ranges with structural punctuation, format placeholders or independently authored test inputs. They must not contain original narrative text. After editing IDs, run `python3 tools/generate_content_schema.py` from the repository root.
-
-`node web/extract-content.mjs extracted/app engine/target/owner-content.pack` creates a native test catalog. Generated catalogs contain original resources and must stay private.
+Open <http://localhost:8899/>. Vite reloads interface changes; rerun `build:wasm`
+after editing Rust. `npm --prefix web run build` produces the complete static app
+in `web/dist`, including dependency license notices.
 
 ## Hosting
 
-The browser requires cross-origin isolation and `SharedArrayBuffer`. `python3 web/serve.py 8899` serves the production build with isolation headers. Vite's development and preview servers also supply them.
+The [CI workflow](../.github/workflows/ci.yml) checks every pull request and deploys
+`web/dist` to [GitHub Pages](https://elohmeier.github.io/wsr/) after successful
+pushes to `main`. It can also be run manually from Actions.
 
-Static hosting must provide isolation headers or use the included isolation bootstrap. Build assets use a relative base so project subpaths can resolve their worker and WASM files. A first visit on a headerless static host may require one automatic reload after service-worker activation. A secure origin (HTTPS or localhost) is required.
+The engine needs `SharedArrayBuffer` and cross-origin isolation on HTTPS or
+localhost. On GitHub Pages, the included service worker enables isolation and may
+reload the first visit once. Relative asset paths support the `/wsr/` subpath.
+If a hard reload bypasses the service worker, reload normally.
 
-Some hard reload and developer-tool modes bypass service workers; a normal reload restores
-the fallback. Hosting with response headers avoids this dependency. The public hosting smoke
-test uses a cold browser profile, a headerless server and a normal reload under `/wsr/`.
+For other hosts, send `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`, or keep the isolation bootstrap.
+Vite and `python3 web/serve.py 8899` provide these headers locally.
 
-## Validation
+## Runtime resources
 
-`npm run test:content` and `npm run test:client` run without original assets. `npm run test:installer` compares local extraction with independently extracted files. `npm run test:content:browser -- INSTALLER COMPLETE_SAVE URL` exercises import, save loading, reload and recovery from missing or malformed cached catalogs without losing saves. The browser scripts use the `agent-browser` CLI and isolated sessions.
+`installer.mjs` reads the owner's `wsr985.exe` without executing it.
+`content-manifest.json` identifies supported source binaries by SHA-256 and
+describes extraction ranges. Only data, documentation, bitmap resources and the
+validated `ENGINE-CONTENT.WSR` catalog are retained in browser storage.
 
-The root README describes opt-in original-engine comparisons and the remaining public-release provenance issue.
+The catalog uses `WSRCP002`, a little-endian u32 record count, records of
+`(u32 id, u32 byte length, raw bytes)`, and a trailing CRC32. Windows-1252 bytes
+are preserved. Manifest recipes must contain extraction metadata and structural
+tokens, without original narrative text. After changing IDs, run
+`python3 tools/generate_content_schema.py`.
+
+For native comparisons, `node web/extract-content.mjs extracted/app
+engine/target/owner-content.pack` creates a private resource pack. See the
+[engine guide](../engine/README.md#original-engine-comparisons) for setup.
 
 ## Learning coach
 
-Choose **Learning coach**, open **Connection**, and enter your provider's model ID and your own API
-key. OpenRouter and browser-accessible endpoints implementing the chat-completions API are supported.
-Custom endpoints need HTTPS (HTTP is allowed on localhost), CORS access from this app and streaming
-tool-call support. No application backend or native Pi process is needed. Keys and conversations
-stay in memory for this page session; no shared API key is included in the build.
+Open **Learning coach** in the desk menu, then **Connection**. Enter your own
+model ID and API key for OpenRouter or a browser-accessible chat-completions
+endpoint. Custom endpoints need HTTPS (HTTP on localhost), CORS and streaming
+tool-call support. Keys and conversations stay in memory for the page session.
 
-The coach uses Pi in a worker and a separate just-bash worker to search the imported help, glossary
-and strategy manual with `cat`, `grep` and `jq`, and inspect a frozen player-visible game snapshot
-through the `wsr` CLI. Only retrieved excerpts and queried visible state enter model requests.
-Full saves, raw globals, other human players' private finances and unrevealed events are excluded.
-The assistant has no trading, dialog-answering, save/load or time-advancing tool.
+The coach uses Pi and a just-bash worker to search imported documentation and
+inspect a frozen snapshot of player-visible state. Retrieved excerpts and queried
+visible state go to your provider; full saves, raw globals, other human players'
+private finances and unrevealed events are excluded. Its tools are read-only.
 
-Open the coach from **Learning coach** in the desk menu. The ticker stays suspended while the coach
-is open. A dialog appearing during snapshot capture uses the last completed snapshot
-plus its visible text; later player actions mark earlier analysis as outdated. A new game, save
-load or player change clears the conversation. **Stop** cancels the current response.
+The ticker pauses while the coach is open. Source citations open local documents;
+**Inspection details** shows tool commands and output. **Add tutorial** imports
+a local text, Markdown or HTML file for this session. **Stop** cancels a response.
+Starting or loading a game, or changing players, clears the conversation.
 
-Source citations open a local viewer with numbered lines. **Inspection details** shows the commands
-used and their bounded output. **Add tutorial** imports a text, Markdown or HTML tutorial for this
-page session; the external tutorial website is not fetched automatically. Strategy help remains
-conversational, without a strategy notebook or dedicated calculators.
+## Browser validation
 
-The runtime imports are loaded when the coach is used. The UI uses the existing Nova/Phosphor shadcn
-controls, including MessageScroller, Message, Bubble, InputGroup, Trace, Marker, Sheet and Dialog.
+Browser scripts use the `agent-browser` CLI with isolated sessions. With the app
+served locally, supply your installer and a complete unfinished human-player save:
 
 ```sh
-npm --prefix web run test:coach
-cargo test --manifest-path engine/Cargo.toml -p wsr-wasm --lib observer::tests
-npm --prefix web run test:coach:browser -- ../wsr985.exe /path/to/fixtures/GAME49.DAT http://localhost:8899/
+node web/content-browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
+node web/browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
+node web/coach-browser-test.mjs wsr985.exe /path/to/GAME01.DAT http://localhost:8899/
 ```
 
-The browser regression uses the actual Pi streaming transport, shell worker and WASM engine against
-a local scripted model endpoint, with no paid API calls. Provide a complete unfinished human-player
-save; the `browser_fixtures` example generates a suitable `GAME49.DAT`. It checks documentation citations,
-HTML tutorial normalization, read-only state access, scrolling, cancellation, uncluttered game dialogs,
-mobile layout and conversation reset. No live model account is used by this regression.
+The coach test uses a local scripted model endpoint and makes no paid API calls.
+`npm --prefix web run test:installer` compares importer output with files in
+`extracted/app`. For asset-free hosting validation, run
+`node web/hosting-browser-test.mjs URL` against a headerless static host serving
+the build under `/wsr/`.
