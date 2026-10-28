@@ -371,6 +371,7 @@ export async function start() {
 				coachSession: m.sessionId,
 			});
 		else if (m.type === 'ui') patch({ ui: { ...m, token: token++ } });
+		else if (m.type === 'help') openDocs('help', m.topic);
 		else if (m.type === 'notice')
 			toast(m.text, { duration: 10000, closeButton: true });
 		else if (m.type === 'progress') patch({ progress: m.text });

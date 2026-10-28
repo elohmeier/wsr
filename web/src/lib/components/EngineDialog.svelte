@@ -11,6 +11,7 @@
 	import Ownership from './Ownership.svelte';
 	import OptionGrid from './OptionGrid.svelte';
 	import GameForm from './GameForm.svelte';
+	import DatabaseSearch from './DatabaseSearch.svelte';
 	let { request: r }: { request: UIRequest } = $props();
 	let value = $state(
 		untrack(() =>
@@ -18,9 +19,18 @@
 		),
 	);
 	let values = $state(
-		untrack(() => (r.kind === 'form' ? r.fields.map((f) => f.value) : [])),
+		untrack(() =>
+			r.kind === 'form'
+				? r.fields.map((f) => f.value)
+				: r.kind === 'databaseSearch'
+					? r.criteria.flatMap((c) => c.fields.map((f) => f.value))
+					: [],
+		),
 	);
 	let lookupOpen = $state(false);
+	let selected = $state<number | null>(
+		untrack(() => (r.kind === 'select' ? r.selected : null)),
+	);
 	let query = $state('');
 	const companies = $derived(
 		r.kind === 'symbolInput'
@@ -32,6 +42,8 @@
 			: [],
 	);
 	const submitForm = (button: number) => answer(button, fieldsPacket(values));
+	const submitSearch = (button: number, checked = '') =>
+		answer(button, fieldsPacket([...values, checked]));
 	async function showLookup() {
 		lookupOpen = true;
 		query = '';
@@ -124,6 +136,7 @@
 			(r.kind === 'form' || r.kind === 'symbolInput') && 'sm:max-w-2xl',
 		)}
 		showCloseButton={false}
+		style={r.kind === 'chart' ? `width: ${r.width + 48}px` : undefined}
 		onEscapeKeydown={(event) => {
 			if (lookupOpen) {
 				event.preventDefault();
@@ -133,10 +146,25 @@
 				event.preventDefault();
 		}}
 		onInteractOutside={(event) => {
-			if (r.kind === 'msgbox' || r.kind === 'form' || r.kind === 'symbolInput')
+			if (
+				r.kind === 'msgbox' ||
+				r.kind === 'form' ||
+				r.kind === 'symbolInput' ||
+				r.kind === 'databaseSearch' ||
+				r.kind === 'select'
+			)
 				event.preventDefault();
 		}}
 		onOpenAutoFocus={(e) => {
+			if (r.kind === 'databaseSearch' && r.focus !== null) {
+				const input = document.getElementById(
+					'database-control-' + r.focus,
+				) as HTMLInputElement | null;
+				if (input) e.preventDefault();
+				input?.focus();
+				if (input?.type === 'text')
+					input.setSelectionRange(input.value.length, input.value.length);
+			}
 			if (r.kind === 'msgbox') {
 				e.preventDefault();
 				const buttons = choices[r.style & 15] || choices[0];
@@ -182,11 +210,42 @@
 			{#if r.kind === 'msgbox'}<p class="select-text whitespace-pre-wrap">
 					{r.text}
 				</p>
+			{:else if r.kind === 'databaseSearch'}<DatabaseSearch
+					request={r}
+					bind:values
+					submit={submitSearch}
+				/>
 			{:else if r.kind === 'form'}<GameForm
 					request={r}
 					bind:values
 					submit={submitForm}
 				/>
+			{:else if r.kind === 'select'}
+				<form
+					id="selection-form"
+					data-selector
+					onsubmit={(event) => {
+						event.preventDefault();
+						if (selected !== null) answer(selected);
+					}}
+				>
+					<p class="mb-4 whitespace-pre-wrap">{r.prompt.join('\n')}</p>
+					<fieldset class="grid gap-3">
+						<legend class="sr-only">{r.title}</legend>
+						{#each r.options as option, i}<label
+								class="flex cursor-pointer items-center gap-3 rounded border border-input p-3"
+							>
+								<input
+									type="radio"
+									name="selection"
+									value={i}
+									bind:group={selected}
+									class="size-4 shrink-0 accent-primary"
+								/>
+								{cleanLabel(option)}
+							</label>{/each}
+					</fieldset>
+				</form>
 			{:else if r.kind === 'symbolInput' && lookupOpen}
 				<section data-symbol-lookup class="flex min-h-0 flex-col gap-3">
 					<Field.Label for="lookup-search"
@@ -238,6 +297,7 @@
 				{#if !acknowledgement}<div class="grid gap-2 sm:grid-cols-2">
 						{#each r.options as option, i}<Button
 								data-choice={i}
+								disabled={r.disabled?.includes(i)}
 								variant="outline"
 								class="h-auto min-h-9 justify-start whitespace-pre-wrap py-2"
 								onclick={() => answer(i)}>{cleanLabel(option)}</Button
@@ -275,11 +335,32 @@
 						variant={value === 1 || value === 6 ? 'default' : 'outline'}
 						onclick={() => answer(value)}>{label}</Button
 					>{/each}
+			{:else if r.kind === 'select'}<Button
+					type="submit"
+					form="selection-form"
+					disabled={selected === null}>{r.accept}</Button
+				><Button variant="outline" onclick={() => answer(-1)}>Cancel</Button>
+			{:else if r.kind === 'databaseSearch'}{#each r.buttons as button}<Button
+						id={'database-control-' + button.id}
+						variant={button.id === 387 ? 'default' : 'outline'}
+						type={button.id === 387 ? 'submit' : 'button'}
+						form="database-form"
+						onclick={button.id === 390
+							? () => openDocs('help', r.helpTopic || '')
+							: button.id === 387
+								? undefined
+								: () => submitSearch(button.id)}
+						>{cleanLabel(button.label)}</Button
+					>{/each}
 			{:else if r.kind === 'form'}{#each r.buttons as button}<Button
 						variant={button.id === 1 ? 'default' : 'outline'}
 						type={button.id === 1 ? 'submit' : 'button'}
 						form="answer-form"
-						onclick={button.id === 1 ? undefined : () => submitForm(button.id)}
+						onclick={button.id === r.helpButton
+							? () => openDocs('help', r.helpTopic || '')
+							: button.id === 1
+								? undefined
+								: () => submitForm(button.id)}
 						>{cleanLabel(button.label)}</Button
 					>{/each}
 				{#if !r.buttons.some((b) => b.id === -1 || b.label.toLowerCase() === 'cancel' || b.label.toLowerCase() === 'exit')}<Button
@@ -343,7 +424,7 @@
 						onclick={() =>
 							button.id === 1376
 								? openDocs('help', 'advanced options')
-								: answer(button.id, gridPacket(rows))}>{button.label}</Button
+								: answer(button.id, gridPacket(rows))}>{cleanLabel(button.label)}</Button
 					>{/each}{/if}
 		</Dialog.Footer>
 	</Dialog.Content>

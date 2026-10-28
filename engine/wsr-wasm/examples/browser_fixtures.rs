@@ -74,6 +74,12 @@ fn main() {
         save::write_save_file(&mut g, &mut ui, &mut rng),
     )
     .unwrap();
+    // Commodity controls become available after the initial January suspension.
+    g.sim_co_count = 599;
+    g.game_number = 45;
+    std::fs::write(output.join("GAME45.DAT"), save::write_save_file(&mut g, &mut ui, &mut rng)).unwrap();
+    g.sim_co_count = 499;
+    g.game_number = 49;
     // A corrupt import must not replace the live session or its last good saved bytes.
     for company in 11..=1600 {
         if !g.dividend_per_share[company].is_finite() {

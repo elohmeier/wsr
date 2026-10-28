@@ -7,7 +7,7 @@
 //!   callbacks and `PromptCloseCryptoFutures` (0x6b6471).
 //!
 //! Both are modal DDT dialogs of command buttons. The port models each as a small state struct (button
-//! captions, enabled flags, open flag: what a UI needs to draw it) and shows it through [`crate::ui::Ui::choose`]
+//! captions, enabled flags, open flag: what a UI needs to draw it) and shows it through [`crate::ui::Ui::choose_enabled`]
 //! in a loop, one choice per button click, until a callback ends the dialog or the user closes it
 //! (`None` = the window's close box, `WM_CLOSE`, which runs no callback). The trades themselves are the
 //! already-ported desk routines (`FuturesBuyOrCover`, `FuturesSellOrShort`, `BuyPhysCommod`,
@@ -57,12 +57,12 @@ pub fn plain_caption(caption: &PbStr) -> PbStr {
     PbStr(caption.as_bytes().iter().copied().filter(|&b| b != b'&').collect())
 }
 
-/// Shows the enabled `buttons` through [`Ui::choose`] and returns the id of the clicked one (`None`: the
+/// Shows command availability through [`Ui::choose_enabled`] and returns the clicked id (`None`: the
 /// dialog was closed).
 pub(crate) fn choose_button(ui: &mut dyn Ui, title: &PbStr, prompt: &[PbStr], buttons: &[Button]) -> Option<i32> {
-    let shown: Vec<&Button> = buttons.iter().filter(|b| b.enabled).collect();
-    let options: Vec<PbStr> = shown.iter().map(|b| plain_caption(&b.caption)).collect();
-    ui.choose(title, prompt, &options).map(|k| shown[k].id)
+    let options: Vec<PbStr> = buttons.iter().map(|b| plain_caption(&b.caption)).collect();
+    let enabled: Vec<bool> = buttons.iter().map(|b| b.enabled).collect();
+    ui.choose_enabled(title, prompt, &options, &enabled).map(|k| buttons[k].id)
 }
 
 /// `RTRIM$(LTRIM$(x))`.

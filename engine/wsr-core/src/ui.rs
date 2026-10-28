@@ -82,6 +82,8 @@ pub struct Form {
     pub prompt: Vec<PbStr>,
     pub fields: Vec<FormField>,
     pub buttons: Vec<(i32, PbStr)>,
+    pub help_topic: Option<PbStr>,
+    pub help_button: Option<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -129,6 +131,20 @@ pub trait Ui {
     /// `INPUTBOX$(prompt, title, default)` → entered text ("" on cancel).
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr;
     fn form(&mut self, _form: &Form) -> Option<FormResponse> { None }
+    /// Open imported contextual documentation without answering the enclosing dialog.
+    fn help(&mut self, _topic: &str) {}
+    fn database_search(&mut self, _view: &crate::logic::info_screens::db_search::DbSearchView)
+        -> Option<Vec<crate::logic::info_screens::db_search::DbSearchAction>> { None }
+    /// Radio choices followed by an explicit Go/Apply action. Scripted hosts keep their choice queue.
+    fn select(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], _selected: Option<usize>, _accept: &PbStr) -> Option<usize> {
+        self.choose(title, prompt, options)
+    }
+    /// Command menus retain unavailable controls in their original positions.
+    fn choose_enabled(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], enabled: &[bool]) -> Option<usize> {
+        let indices: Vec<_> = (0..options.len()).filter(|&i| enabled.get(i) == Some(&true)).collect();
+        let shown: Vec<_> = indices.iter().map(|&i| options[i].clone()).collect();
+        self.choose(title, prompt, &shown).and_then(|i| indices.get(i).copied())
+    }
     /// Symbol entry with the original LOOK UP list, already filtered by the engine.
     fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, _companies: &[SymbolChoice]) -> PbStr {
         self.inputbox(prompt, title, default)
@@ -200,6 +216,11 @@ impl Ui for DialogUi<'_> {
     fn msgbox(&mut self, text: &PbStr, style: i32, title: &PbStr) -> i32 { self.inner.msgbox(text, style, title) }
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr { self.inner.inputbox(prompt, title, default) }
     fn form(&mut self, form: &Form) -> Option<FormResponse> { self.inner.form(form) }
+    fn help(&mut self, topic: &str) { self.inner.help(topic); }
+    fn database_search(&mut self, view: &crate::logic::info_screens::db_search::DbSearchView)
+        -> Option<Vec<crate::logic::info_screens::db_search::DbSearchAction>> { self.inner.database_search(view) }
+    fn select(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], selected: Option<usize>, accept: &PbStr) -> Option<usize> { self.inner.select(title, prompt, options, selected, accept) }
+    fn choose_enabled(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], enabled: &[bool]) -> Option<usize> { self.inner.choose_enabled(title, prompt, options, enabled) }
     fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, companies: &[SymbolChoice]) -> PbStr { self.inner.symbol_input(prompt, title, default, companies) }
     fn report(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool) -> ReportAction { self.inner.report(title, lines, yes_no) }
     fn report_with_actions(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool, options: &ReportOptions) -> ReportAction { self.inner.report_with_actions(title, lines, yes_no, options) }
@@ -285,5 +306,7 @@ mod tests {
         assert_eq!(s.choose(&PbStr::from("T"), &[], &opts), Some(1));
         assert_eq!(s.choose(&PbStr::from("T"), &[], &opts), None);
         assert_eq!(s.choose(&PbStr::from("T"), &[], &opts), None);
+        s.answers.push_back(PbStr::from("0"));
+        assert_eq!(s.choose_enabled(&PbStr::from("T"), &[], &opts, &[false, true, false, false]), Some(1));
     }
 }

@@ -17,9 +17,13 @@
 		if (!$game.ready && $game.summary) filesOpen = true;
 	});
 	const prepared = $derived(
-		['WSR101.DAT', 'MSCNEWS.DAT', 'SCORES.WSR', 'CORPNAME.DAT', 'ENGINE-CONTENT.WSR'].every((n) =>
-			$game.files.some((f) => f.name === n),
-		),
+		[
+			'WSR101.DAT',
+			'MSCNEWS.DAT',
+			'SCORES.WSR',
+			'CORPNAME.DAT',
+			'ENGINE-CONTENT.WSR',
+		].every((n) => $game.files.some((f) => f.name === n)),
 	);
 	const banner = $derived(
 		$game.files.some((f) => f.name === 'WSR-BANNER.BMP')
@@ -37,7 +41,8 @@
 			event.preventDefault();
 			openDocs(
 				'help',
-				$game.ui?.kind === 'optionStation' ? 'advanced options' : '',
+				$game.ui?.helpTopic ||
+					($game.ui?.kind === 'optionStation' ? 'advanced options' : ''),
 			);
 		}
 	}}

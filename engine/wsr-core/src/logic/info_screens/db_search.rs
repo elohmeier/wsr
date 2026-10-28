@@ -12,7 +12,8 @@
 //! the check marks the routines set) and drives it with [`DbSearchAction`]s: [`db_search_dispatch`]
 //! runs the callback of a control exactly like a click (or an `EN_CHANGE` of a value box) in the
 //! original. [`show_db_search_dialog_with`] runs the modal loop with any driver (a web UI);
-//! [`show_db_search_dialog`] drives it through [`Ui::choose`] / [`Ui::inputbox`].
+//! [`show_db_search_dialog`] uses [`Ui::database_search`] for interactive hosts, retaining the
+//! [`Ui::choose`] / [`Ui::inputbox`] fallback for scripted comparisons.
 
 // Statements keep the original BASIC shape on purpose.
 #![allow(
@@ -46,6 +47,9 @@ use crate::pb::string::{compare, instr, ltrim, mid, parse_any, remove_any, repla
 use crate::pb::numeric::{to_long, to_quad, Cur};
 use crate::state::Globals;
 use crate::ui::Ui;
+
+mod view;
+pub use view::{DbSearchView, DbSearchCriterion, DbSearchField, DbSearchChange, db_search_view};
 
 /// SINGLE constant of the original's constant pool (`fmul dword [...]`).
 fn sf(x: f32) -> Ext {
@@ -141,6 +145,8 @@ impl DbSearchDlg {
 pub enum DbSearchAction {
     /// Click on a checkbox or button (`BN_CLICKED`): runs the control's callback.
     Click(i32),
+    /// Set a checkbox to its submitted state after any pending text edits have been applied.
+    SetChecked(i32, bool),
     /// Type `text` into value box `id` (no notification).
     SetText(i32, PbStr),
     /// `EN_CHANGE` of value box `id`: runs its callback.
@@ -200,9 +206,23 @@ fn industry_label(g: &Globals, industry: i32) -> PbStr {
     name
 }
 
-/// Port of ShowDbSearchDialog (0x5472ee), driven through [`Ui::choose`] (see [`show_db_search_dialog_with`]).
+/// Port of ShowDbSearchDialog (0x5472ee), with native controls or a scripted fallback.
 pub fn show_db_search_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng) {
-    show_db_search_dialog_with(g, ui, rng, &mut choose_action);
+    let mut pending = std::collections::VecDeque::new();
+    let mut focus = None;
+    let mut driver = |g: &mut Globals, ui: &mut dyn Ui, dlg: &DbSearchDlg| {
+        if let Some(action) = pending.pop_front() { return action; }
+        if let Some(actions) = ui.database_search(&db_search_view(dlg, focus)) {
+            focus = actions.iter().rev().find_map(|action| match action {
+                DbSearchAction::Edit(id, _) | DbSearchAction::SetChecked(id, _)
+                    | DbSearchAction::EditChanged(id) | DbSearchAction::Click(id) => Some(*id),
+                _ => None,
+            });
+            pending.extend(actions);
+            pending.pop_front().unwrap_or(DbSearchAction::Close)
+        } else { choose_action(g, ui, dlg) }
+    };
+    show_db_search_dialog_with(g, ui, rng, &mut driver);
 }
 
 /// The [`Ui`] driver of the dialog: one [`Ui::choose`] per action listing the checkboxes (with their
@@ -346,6 +366,11 @@ pub fn db_search_dispatch(
     driver: &mut dyn FnMut(&mut Globals, &mut dyn Ui, &DbSearchDlg) -> DbSearchAction,
 ) {
     match action {
+        DbSearchAction::SetChecked(id, checked) => {
+            if (dlg.check(id) != 0) != checked {
+                db_search_dispatch(g, ui, rng, dlg, DbSearchAction::Click(id), driver);
+            }
+        }
         DbSearchAction::SetText(id, t) => dlg.set_text(id, t),
         DbSearchAction::Edit(id, t) => {
             dlg.set_text(id, t);
@@ -388,7 +413,7 @@ pub fn db_search_dispatch(
             ctl::CHK_EXCL_BANKRUPTS => db_search_on_chk_excl_bankrupts(g, ui, rng, dlg),
             ctl::BTN_DISPLAY => db_search_on_display(g, ui, rng, dlg),
             ctl::BTN_CLEAR => db_search_on_clear(g, ui, rng, dlg, driver),
-            ctl::BTN_HELP => db_search_on_help(),
+            ctl::BTN_HELP => db_search_on_help(ui),
             ctl::BTN_CLOSE => db_search_on_close(dlg),
             _ => {}
         },
@@ -864,7 +889,7 @@ pub fn db_search_on_display(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, dlg
 }
 
 /// Port of DbSearch_OnHelp (0x54af81): runs `WSRHELP.EXE |DB|` (the help viewer; no state effects).
-pub fn db_search_on_help() {}
+pub fn db_search_on_help(ui: &mut dyn Ui) { ui.help("database search"); }
 
 /// Port of DbSearch_OnClose (0x54b00c): ends the dialog.
 pub fn db_search_on_close(dlg: &mut DbSearchDlg) {

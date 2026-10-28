@@ -3,7 +3,7 @@
 //! `CheatInsiderMergerTip` (0x677230) and the antitrust cheat `CheatDisableAntitrust` (0x680954).
 //!
 //! The dialog is a DDT dialog with four option buttons and one button (CLOSE, renamed GO once an option
-//! is picked). The port shows it through [`Ui::choose`]: the four option labels in screen order
+//! is picked). The port shows it through [`Ui::select`]: the four option labels in screen order
 //! (add/subtract cash, merger tip, earnings tip, antitrust); picking one is the option callback
 //! (`TmpExt1` = 1..4) followed by the button, cancelling is the button without an option (CLOSE).
 
@@ -278,7 +278,7 @@ pub fn cheat_menu_options(g: &Globals) -> [PbStr; 4] {
 /// Builds and shows the modal cheat dialog "CHEAT MENU (For <player>)" (`CloseAllDialogs 1` first):
 /// option labels depend on the antitrust cheats, the current insider tip and `PlayerCheatCode`, which
 /// in long games (`LongGameMarker > 5`, less than 36 years) is set to `ROUND(RND * 5 + 7)` here.
-/// `TmpExt1 = 0`, `DlgOpen_CheatMenu = 1`; the choice goes through [`Ui::choose`]: a picked option is
+/// `TmpExt1 = 0`, `DlgOpen_CheatMenu = 1`; the choice goes through [`Ui::select`]: a picked option is
 /// its callback ([`dlg_cheat_menu_opt`]) followed by the button ([`dlg_cheat_menu_go`]); cancel is the
 /// button without an option.
 ///
@@ -297,7 +297,7 @@ pub fn dlg_cheat_menu(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, time_secs
     g.tmp_ext1 = Ext::from_f64(0.0);
     g.dlg_open_cheat_menu = 1;
     // DIALOG SHOW MODAL hCheatDlg CALL DlgProcCheatMenuColors
-    if let Some(k) = ui.choose(&title, &[s(__content.string(5783))], &options) {
+    if let Some(k) = ui.select(&title, &[s(__content.string(5783))], &options, None, &s("Go")) {
         dlg_cheat_menu_opt(g, cast::<i32, _>(k) + 1);
     }
     dlg_cheat_menu_go(g, ui, rng, time_secs);

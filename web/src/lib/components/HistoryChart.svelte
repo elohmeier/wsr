@@ -22,7 +22,11 @@
 
 {#if data.length}
 	<div class="chart" aria-label={request.title + ' monthly history'}>
-		<Chart.Container {config} class="h-[360px] w-full aspect-auto">
+		<Chart.Container
+			{config}
+			class="w-full aspect-auto"
+			style={`height: ${Math.max(120, request.height - 52)}px`}
+		>
 			<LineChart
 				{data}
 				x="date"
@@ -121,3 +125,9 @@
 			></Empty.Header
 		></Empty.Root
 	>{/if}
+{#each request.controls.filter((control) => control.id === 521 && control.kind === 'label') as control}<p
+		class="wsr-money"
+		data-chart-last
+	>
+		{control.text}
+	</p>{/each}

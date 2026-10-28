@@ -838,7 +838,7 @@ fn sort_by_rating(f: &mut Frame, n: usize) {
 /// LoanTradeDlg_OptSellSubprime (0x5b93be), LoanTradeDlg_BtnGo (0x5b940a) and
 /// LoanTradeDlg_BtnCancel (0x5b9489).
 /// The modal "Buy/Sell Loans" dialog with eight option buttons (buy business / consumer / prime mortgage
-/// / subprime loans, sell the same) and GO / CANCEL, shown through [`Ui::choose`]. The choice comes back
+/// / subprime loans, sell the same) and GO / CANCEL, shown through [`Ui::select`]. The choice comes back
 /// in `TmpExt1` (1..8; 0 = cancelled). The dialog handle `hLoanTradeDlg` (`DIALOG NEW`) and the colour
 /// procedure DlgProcLoanTradeColors (0x5b8a80) are not modelled.
 pub fn show_loan_trade_type_dialog(g: &mut Globals, ui: &mut dyn Ui, _h_parent: i32) {
@@ -856,7 +856,7 @@ pub fn show_loan_trade_type_dialog(g: &mut Globals, ui: &mut dyn Ui, _h_parent: 
         s(__content.string(3775)),
         s(__content.string(1673)),
     ];
-    match ui.choose(&title, &prompt, &options) {
+    match ui.select(&title, &prompt, &options, None, &s("Go")) {
         Some(k) => {
             // option button k (LoanTradeDlg_Opt*) sets TmpExt1 = k + 1, then GO
             g.tmp_ext1 = cast::<Ext, _>(k + 1);

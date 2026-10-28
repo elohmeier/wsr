@@ -13,7 +13,9 @@ pub fn show_govt_bond_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, en
     let short = mid(g.short_bond_desc.as_bytes(), 1, 4);
     let options = [s(__content.string(10133)) + &long, s(__content.string(10134)) + &long,
         s(__content.string(10135)) + &short, s(__content.string(10136)) + &short];
-    while let Some(choice) = ui.choose(&s(__content.string(10137)), &[], &options) {
+    let mut selected = None;
+    while let Some(choice) = ui.select(&s(__content.string(10137)), &[], &options, selected, &s("Go")) {
+        selected = Some(choice);
         g.tmp_ext1 = cast::<Ext, _>(choice + 1);
         if g.sim_co_count != g.popup_req_co_cnt { g.gov_bond_desk_action = 0; }
         g.popup_req_co_cnt = g.sim_co_count;
@@ -33,7 +35,9 @@ pub fn show_who_owns_what_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng
     if !env.skips(0x49117c) { crate::logic::sim_entity::quarter_start::pack_holding_arrays(g, ui); }
     g.dlg_open_who_owns_what = 1;
     let options = [s(__content.string(10138)), s(__content.string(10139)), s("Interest rate swaps"), s(__content.string(10140)), s("Stock cross-holdings"), s(__content.string(10141))];
-    while let Some(choice) = ui.choose(&s(__content.string(10142)), &[], &options) {
+    let mut selected_choice = Some(0);
+    while let Some(choice) = ui.select(&s(__content.string(10142)), &[], &options, selected_choice, &s("Go")) {
+        selected_choice = Some(choice);
         let selected = g.sel_entity;
         g.tmp_ext1 = Ext::from_f64(0.0);
         use crate::logic::info_screens::holders;

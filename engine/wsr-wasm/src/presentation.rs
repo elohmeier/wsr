@@ -11,9 +11,59 @@ fn js(s: &PbStr) -> String {
     json_str(&s.to_display())
 }
 
+pub fn db_search_json(view: &wsr_core::logic::info_screens::db_search::DbSearchView) -> String {
+    serde_json::json!({
+        "title": view.title.to_display(), "prompt": view.prompt.to_display(), "count": view.count.to_display(),
+        "helpTopic": "database search", "focus": view.focus,
+        "criteria": view.criteria.iter().map(|c| serde_json::json!({
+            "id": c.id, "label": c.label.to_display(), "checked": c.checked,
+            "fields": c.fields.iter().map(|f| serde_json::json!({"id": f.id, "label": f.label.to_display(), "value": f.value.to_display()})).collect::<Vec<_>>(),
+            "change": c.change.as_ref().map(|b| serde_json::json!({"id": b.id, "label": b.label.to_display(), "value": b.value.to_display()}))
+        })).collect::<Vec<_>>(),
+        "buttons": view.buttons.iter().map(|(id, label)| serde_json::json!({"id": id, "label": label.to_display()})).collect::<Vec<_>>()
+    }).to_string()
+}
+
+pub fn db_search_actions(bytes: &[u8], view: &wsr_core::logic::info_screens::db_search::DbSearchView)
+    -> Vec<wsr_core::logic::info_screens::db_search::DbSearchAction> {
+    use wsr_core::logic::info_screens::db_search::{DbSearchAction as Action, ctl};
+    fn parse(bytes: &[u8], view: &wsr_core::logic::info_screens::db_search::DbSearchView) -> Option<Vec<Action>> {
+        let button = i32::from_le_bytes(bytes.get(..4)?.try_into().ok()?);
+        if button == -1 { return Some(vec![Action::Close]); }
+        let fields: Vec<_> = view.criteria.iter().flat_map(|c| &c.fields).collect();
+        let is_field = fields.iter().any(|f| f.id == button);
+        let checkbox = view.criteria.iter().any(|c| c.id == button);
+        if !is_field && !checkbox && !view.buttons.iter().any(|(id, _)| *id == button)
+            && !view.criteria.iter().any(|c| c.change.as_ref().is_some_and(|b| b.id == button)) { return None; }
+        let mut p = 4;
+        let mut values = Vec::new();
+        for _ in 0..=fields.len() {
+            let len = u32::from_le_bytes(bytes.get(p..p + 4)?.try_into().ok()?) as usize;
+            p += 4;
+            if len > 4096 { return None; }
+            values.push(PbStr(bytes.get(p..p + len)?.to_vec()));
+            p += len;
+        }
+        if p != bytes.len() { return None; }
+        let checked = values.pop()?;
+        let mut actions: Vec<_> = fields.iter().zip(values).filter(|(f, value)| f.value != *value)
+            .map(|(f, value)| Action::Edit(f.id, value)).collect();
+        if checkbox {
+            if checked != "0" && checked != "1" { return None; }
+            actions.push(Action::SetChecked(button, checked == "1"));
+        } else if !is_field { actions.push(Action::Click(button)); }
+        else if actions.is_empty() { actions.push(Action::EditChanged(button)); }
+        if button == ctl::BTN_CLOSE { return Some(vec![Action::Close]); }
+        Some(actions)
+    }
+    parse(bytes, view).unwrap_or_else(|| vec![Action::Close])
+}
+
 pub fn form_json(form: &wsr_core::ui::Form) -> String {
     serde_json::json!({
         "title": form.title.to_display(),
+        "helpTopic": form.help_topic.as_ref().map(PbStr::to_display),
+        "helpButton": form.help_button,
         "prompt": form.prompt.iter().map(PbStr::to_display).collect::<Vec<_>>(),
         "fields": form.fields.iter().map(|f| serde_json::json!({
             "id": f.id, "label": f.label.to_display(), "value": f.value.to_display(),
@@ -107,6 +157,7 @@ pub fn option_json(spec: &OptionStation) -> String {
         })
         .collect::<Vec<_>>()
         .join(",");
+    let close_all_caption = spec.close_all_caption.to_display();
     let buttons = [
         (ctl::CALC, "Calculate"),
         (ctl::SUBMIT, "Submit orders"),
@@ -114,7 +165,7 @@ pub fn option_json(spec: &OptionStation) -> String {
         (ctl::AUTO_TRADE, "Auto-trade"),
         (ctl::SIZE_LIMITS, "Position limits"),
         (ctl::LIST_OPTIONS, "List positions"),
-        (ctl::CLOSE_ALL_OPTIONS, "Close all positions"),
+        (ctl::CLOSE_ALL_OPTIONS, close_all_caption.as_str()),
         (ctl::HELP, "Help"),
         (ctl::CLOSE, "Close"),
     ];
@@ -175,6 +226,24 @@ mod tests {
 use wsr_core::pb::real::{Ext, cast};
 
     use super::*;
+    #[test]
+    fn database_packets_apply_pending_edits_before_checkbox_state_and_reject_truncation() {
+        use wsr_core::logic::info_screens::db_search::{DbSearchDlg, DbSearchAction, db_search_view, ctl};
+        crate::install_test_content();
+        let mut dlg = DbSearchDlg::default();
+        dlg.set_text(ctl::TXT_MAX_PE, PbStr::from("10"));
+        let view = db_search_view(&dlg, None);
+        let mut bytes = ctl::CHK_LOW_PE.to_le_bytes().to_vec();
+        for field in view.criteria.iter().flat_map(|c| &c.fields) {
+            let value = if field.id == ctl::TXT_MAX_PE { PbStr::from("25") } else { field.value.clone() };
+            bytes.extend_from_slice(&(value.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        bytes.extend_from_slice(&1u32.to_le_bytes()); bytes.push(b'1');
+        assert_eq!(db_search_actions(&bytes, &view), [DbSearchAction::Edit(ctl::TXT_MAX_PE, PbStr::from("25")), DbSearchAction::SetChecked(ctl::CHK_LOW_PE, true)]);
+        bytes.pop();
+        assert_eq!(db_search_actions(&bytes, &view), [DbSearchAction::Close]);
+    }
     #[test]
     fn form_packets_preserve_empty_fields_and_reject_partial_submissions() {
         use wsr_core::ui::{Form, FormField};

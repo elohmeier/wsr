@@ -25,6 +25,201 @@ impl Ui for Forms {
     fn news(&mut self, _: &PbStr) {}
 }
 
+#[derive(Default)]
+struct SearchUi {
+    calls: usize,
+    topics: Vec<String>,
+}
+impl Ui for SearchUi {
+    fn inputbox(&mut self, _: &PbStr, _: &PbStr, _: &PbStr) -> PbStr {
+        panic!("Database fields must stay in the search screen")
+    }
+    fn msgbox(&mut self, _: &PbStr, _: i32, _: &PbStr) -> i32 {
+        1
+    }
+    fn report(&mut self, _: &PbStr, _: &[PbStr], _: bool) -> ReportAction {
+        ReportAction::Ok
+    }
+    fn news(&mut self, _: &PbStr) {}
+    fn help(&mut self, topic: &str) {
+        self.topics.push(topic.into());
+    }
+    fn database_search(
+        &mut self,
+        view: &wsr_core::logic::info_screens::db_search::DbSearchView,
+    ) -> Option<Vec<wsr_core::logic::info_screens::db_search::DbSearchAction>> {
+        use wsr_core::logic::info_screens::db_search::{DbSearchAction as Action, ctl};
+        self.calls += 1;
+        assert_eq!(view.criteria.len(), 19);
+        assert_eq!(view.criteria.iter().flat_map(|c| &c.fields).count(), 7);
+        let pe = view
+            .criteria
+            .iter()
+            .find(|c| c.id == ctl::CHK_LOW_PE)
+            .unwrap();
+        match self.calls {
+            1 => Some(vec![
+                Action::Edit(ctl::TXT_MAX_PE, PbStr::from("25")),
+                Action::SetChecked(ctl::CHK_LOW_PE, true),
+                Action::Click(ctl::BTN_MGMT_RATING),
+            ]),
+            2 => {
+                assert!(pe.checked);
+                assert_eq!(pe.fields[0].value, "25");
+                let management = view
+                    .criteria
+                    .iter()
+                    .find(|c| c.id == ctl::CHK_MGMT_RATING)
+                    .unwrap();
+                assert!(management.checked);
+                assert_eq!(management.change.as_ref().unwrap().value, "Average");
+                Some(vec![Action::Click(ctl::BTN_HELP)])
+            }
+            3 => {
+                assert_eq!(self.topics, ["database search"]);
+                assert!(pe.checked);
+                assert_eq!(pe.fields[0].value, "25");
+                Some(vec![Action::Click(ctl::BTN_CLEAR)])
+            }
+            4 => {
+                assert!(view.criteria.iter().all(|c| !c.checked));
+                Some(vec![Action::Close])
+            }
+            _ => panic!("Unexpected database dialog"),
+        }
+    }
+}
+
+#[test]
+fn database_screen_uses_original_edit_checkbox_rating_help_and_clear_callbacks() {
+    crate::install_test_content();
+    let mut g = Globals::default();
+    g.cur_player = 1;
+    g.active_entity = 1;
+    g.num_players = 2;
+    let mut ui = SearchUi::default();
+    wsr_core::logic::info_screens::db_search::show_db_search_dialog(
+        &mut g,
+        &mut ui,
+        &mut Rng::from_state(1),
+    );
+    assert_eq!(ui.calls, 4);
+    assert_eq!(g.dlg_open_db_search, 0);
+    wsr_core::logic::trade_screens::ir_swaps::ir_swap_help_click(&g, &mut ui);
+    assert_eq!(ui.topics, ["database search", "interest rate swaps"]);
+}
+
+#[derive(Default)]
+struct ChoicesUi {
+    selectors: Vec<(usize, String)>,
+    commands: usize,
+    disabled_seen: bool,
+}
+impl Ui for ChoicesUi {
+    fn inputbox(&mut self, _: &PbStr, _: &PbStr, _: &PbStr) -> PbStr {
+        panic!("No transaction was confirmed")
+    }
+    fn msgbox(&mut self, _: &PbStr, _: i32, _: &PbStr) -> i32 {
+        1
+    }
+    fn report(&mut self, _: &PbStr, _: &[PbStr], _: bool) -> ReportAction {
+        ReportAction::Ok
+    }
+    fn news(&mut self, _: &PbStr) {}
+    fn choose(&mut self, _: &PbStr, _: &[PbStr], _: &[PbStr]) -> Option<usize> {
+        panic!("Use the original control type")
+    }
+    fn select(
+        &mut self,
+        _: &PbStr,
+        _: &[PbStr],
+        options: &[PbStr],
+        _: Option<usize>,
+        accept: &PbStr,
+    ) -> Option<usize> {
+        self.selectors.push((options.len(), accept.to_display()));
+        None
+    }
+    fn choose_enabled(
+        &mut self,
+        _: &PbStr,
+        _: &[PbStr],
+        options: &[PbStr],
+        enabled: &[bool],
+    ) -> Option<usize> {
+        self.commands += 1;
+        assert_eq!(options.len(), 8);
+        match self.commands {
+            1 => Some(0), // Select oil.
+            2 => Some(5), // Switch to physical trading.
+            3 => {
+                assert!(!enabled[2] && !enabled[3]);
+                assert!(enabled[0] && enabled[1] && enabled[7]);
+                self.disabled_seen = true;
+                None
+            }
+            _ => panic!("Unexpected commodity desk command"),
+        }
+    }
+}
+
+#[test]
+fn all_seven_selectors_require_confirmation_and_cancel_without_starting_a_transaction() {
+    crate::install_test_content();
+    use wsr_core::logic::{
+        corp_finance, info_screens, newgame::LocalTime, restructure, shell, trade_screens,
+    };
+    let mut g = Globals::default();
+    g.cur_player = 1;
+    g.active_entity = 1;
+    g.num_players = 2;
+    let mut ui = ChoicesUi::default();
+    let mut rng = Rng::from_state(1);
+    let env = shell::Env::new(&LocalTime::HARNESS);
+    shell::dialogs::show_govt_bond_dialog(&mut g, &mut ui, &mut rng, &env);
+    shell::dialogs::show_who_owns_what_dialog(&mut g, &mut ui, &mut rng, &env);
+    corp_finance::loans::show_loan_trade_type_dialog(&mut g, &mut ui, 0);
+    restructure::capital::show_cap_contrib_dialog(&mut g, &mut ui, 0);
+    trade_screens::option_station::strategy::show_option_strategy_picker(&mut g, &mut ui, 0);
+    trade_screens::alerts_alloc::dlg_price_alert_type(&mut g, &mut ui, 0);
+    info_screens::cheat::dlg_cheat_menu(&mut g, &mut ui, &mut rng, 0, 0);
+    assert_eq!(
+        ui.selectors,
+        [
+            (4, "Go".into()),
+            (6, "Go".into()),
+            (8, "Go".into()),
+            (4, "Apply".into()),
+            (10, "Go".into()),
+            (13, "Apply".into()),
+            (4, "Go".into())
+        ]
+    );
+    assert_eq!(g.turn_action_count, 0);
+}
+
+#[test]
+fn commodity_desk_keeps_short_controls_visible_and_disabled_in_physical_mode() {
+    crate::install_test_content();
+    let mut g = Globals::default();
+    g.cur_player = 1;
+    g.active_entity = 1;
+    g.num_players = 2;
+    g.start_year = 2026;
+    g.cur_year = 2027;
+    g.exchange_rate = 1.into();
+    g.cash[1] = 5000.into();
+    let mut ui = ChoicesUi::default();
+    wsr_core::logic::trade_screens::commod_crypto::commod_desk::show_commodity_desk(
+        &mut g,
+        &mut ui,
+        &mut Rng::from_state(1),
+        0,
+    );
+    assert!(ui.disabled_seen);
+    assert_eq!(g.turn_action_count, 0);
+}
+
 #[test]
 fn startup_preserves_all_fields_on_invalid_input_and_declined_long_game() {
     crate::install_test_content();

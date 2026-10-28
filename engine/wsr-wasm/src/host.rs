@@ -4,7 +4,7 @@
 //! with `Atomics.wait` until the user has answered (see `web/worker.js`), so game code can call
 //! `ui.msgbox(…)` synchronously, exactly like the original's modal dialogs. Strings are Windows-1252
 //! bytes. String results come back as buffers the host allocated with `wsr_alloc` (`[len: u32][bytes]`).
-use wsr_core::pb::real::{Ext, cast};
+use wsr_core::pb::real::cast;
 
 
 use wsr_core::pb::pbstr::PbStr;
@@ -34,6 +34,9 @@ unsafe extern "C" {
     fn host_option_station(json: *const u8, len: usize) -> *mut u8;
     fn host_form(json: *const u8, len: usize) -> *mut u8;
     fn host_symbol_input(json: *const u8, len: usize) -> *mut u8;
+    fn host_select(json: *const u8, len: usize) -> i32;
+    fn host_help(topic: *const u8, len: usize);
+    fn host_db_search(json: *const u8, len: usize) -> *mut u8;
 }
 
 /// Take ownership of a `[len: u32][bytes]` buffer allocated by the host via `wsr_alloc`.
@@ -96,6 +99,28 @@ impl Ui for HostUi {
         let json = crate::presentation::form_json(form);
         let bytes = take(unsafe { host_form(json.as_ptr(), json.len()) });
         Some(crate::presentation::form_response(&bytes, form))
+    }
+    fn help(&mut self, topic: &str) { unsafe { host_help(topic.as_ptr(), topic.len()) }; }
+    fn database_search(&mut self, view: &wsr_core::logic::info_screens::db_search::DbSearchView)
+        -> Option<Vec<wsr_core::logic::info_screens::db_search::DbSearchAction>> {
+        let json = crate::presentation::db_search_json(view);
+        let bytes = take(unsafe { host_db_search(json.as_ptr(), json.len()) });
+        Some(crate::presentation::db_search_actions(&bytes, view))
+    }
+    fn select(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], selected: Option<usize>, accept: &PbStr) -> Option<usize> {
+        let json = serde_json::json!({ "title": title.to_display(),
+            "prompt": prompt.iter().map(PbStr::to_display).collect::<Vec<_>>(),
+            "options": options.iter().map(PbStr::to_display).collect::<Vec<_>>(),
+            "selected": selected, "accept": accept.to_display() }).to_string();
+        usize::try_from(unsafe { host_select(json.as_ptr(), json.len()) }).ok().filter(|&i| i < options.len())
+    }
+    fn choose_enabled(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], enabled: &[bool]) -> Option<usize> {
+        let json = serde_json::json!({ "title": title.to_display(),
+            "prompt": prompt.iter().map(PbStr::to_display).collect::<Vec<_>>(),
+            "options": options.iter().map(PbStr::to_display).collect::<Vec<_>>(),
+            "disabled": (0..options.len()).filter(|&i| enabled.get(i) != Some(&true)).collect::<Vec<_>>() }).to_string();
+        usize::try_from(unsafe { host_choose(json.as_ptr(), json.len()) }).ok()
+            .filter(|&i| i < options.len() && enabled.get(i) == Some(&true))
     }
     fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, companies: &[wsr_core::ui::SymbolChoice]) -> PbStr {
         let json = serde_json::json!({

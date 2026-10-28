@@ -1008,7 +1008,7 @@ fn refresh_after_transfer(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, f: &m
 /// CapContribDlg_OptBusinessAssets (0x5dc546), CapContribDlg_OptStock (0x5dc592), CapContribDlg_OptBonds
 /// (0x5dc5de), CapContribDlg_BtnApply (0x5dc62a) and CapContribDlg_BtnCancel (0x5dc6a9).
 /// The modal " [runtime resource wording] <subsidiary TmpExt1>" dialog with four option buttons (cash,
-/// business assets, stock, bonds) and Apply/Cancel, shown through [`Ui::choose`]. The choice comes back in
+/// business assets, stock, bonds) and Apply/Cancel, shown through [`Ui::select`]. The choice comes back in
 /// `TmpExt1` (1..4; 0 = cancelled or Apply without a selection); `DlgOpen_CapContrib` is 1 while it is open.
 /// The dialog handle `hCapContribDlg` (`DIALOG NEW`) is not modelled.
 pub fn show_cap_contrib_dialog(g: &mut Globals, ui: &mut dyn Ui, _h_parent: i32) {
@@ -1025,7 +1025,7 @@ pub fn show_cap_contrib_dialog(g: &mut Globals, ui: &mut dyn Ui, _h_parent: i32)
         s(__content.string(9434)),
     ];
     let prompt = [s(__content.string(9435)), s(__content.string(9436))];
-    match ui.choose(&title, &prompt, &options) {
+    match ui.select(&title, &prompt, &options, None, &s("Apply")) {
         Some(k) => {
             // option button k (CapContribDlg_Opt*) sets TmpExt1 = k + 1, then Apply
             g.tmp_ext1 = cast::<Ext, _>(k + 1);

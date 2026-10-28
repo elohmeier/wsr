@@ -59,9 +59,18 @@ const host = {
     if (r === 3) lastLink = data.slice(0, ctrl[2]);
     return r;
   },
+  host_db_search: (p, n) => {
+    const button = ask({kind: 'databaseSearch', ...readJson(p, n)}), fields = data.slice(0, ctrl[2]);
+    const bytes = new Uint8Array(4 + fields.length);
+    new DataView(bytes.buffer).setInt32(0, button, true);
+    bytes.set(fields, 4);
+    return toWasm(bytes);
+  },
   host_last_link: () => toWasm(lastLink),
   host_news: (p, n) => postMessage({ type: 'news', text: str(p, n) }),
   host_choose: (p, n) => ask({ kind: 'choose', ...readJson(p, n) }),
+  host_select: (p, n) => ask({ kind: 'select', ...readJson(p, n) }),
+  host_help: (p, n) => postMessage({ type: 'help', topic: utf8.decode(new Uint8Array(w.memory.buffer, p, n)) }),
   host_chart: (p, n) => ask({ kind: 'chart', ...readJson(p, n) }),
   host_diagram: (p, n) => ask({kind:'ownership', ...readJson(p,n)}),
   host_option_station: (p,n) => {

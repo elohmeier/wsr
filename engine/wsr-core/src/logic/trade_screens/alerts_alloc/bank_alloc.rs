@@ -83,7 +83,7 @@ pub fn show_dlg_bank_asset_alloc(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng
     while dlg.open {
         use crate::ui::{Form, FormField};
         let form = Form {
-            title: s(BANK_ALLOC_DLG_TITLE(&content)),
+            title: s(BANK_ALLOC_DLG_TITLE(&content)), help_topic: None, help_button: None,
             prompt: vec![s(BANK_ALLOC_INSTRUCTIONS(&content)), s(content.string(11256)) + &dlg.total],
             fields: (0..5).map(|k| FormField {
                 id: BANK_ALLOC_FIELD_IDS[k], label: s(BANK_ALLOC_LABELS(&content)[k]) + " (%)",

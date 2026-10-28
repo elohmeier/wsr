@@ -19,7 +19,7 @@
 <Table.Root class="option-grid min-w-[760px]">
 	<Table.Header
 		><Table.Row
-			>{#each ['Line', 'Type', 'Buy / sell', 'Strike price', 'Expiry (month/year)', 'Size (%)', 'Option price'] as label}<Table.Head
+			>{#each ['Line', 'Type', 'Buy / sell', 'Strike price', 'Expiry (month/year)', 'Size (1–10%)', 'Option price'] as label}<Table.Head
 					>{label}</Table.Head
 				>{/each}</Table.Row
 		></Table.Header

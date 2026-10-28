@@ -230,7 +230,7 @@ fn alert_record(g: &Globals, entity: i32, dir_code: &PbStr, target_value: Ext80)
 
 /// Port of DlgPriceAlertType (0x68498c).
 /// The modal " [runtime resource wording] " dialog: 13 option buttons for the alert type
-/// ([`price_alert_type_options`]), APPLY and CANCEL, shown through [`Ui::choose`] (a choice = its option
+/// ([`price_alert_type_options`]), APPLY and CANCEL, shown through [`Ui::select`] (a choice = its option
 /// button, then APPLY; `None` = CANCEL). The chosen type comes back in `TmpExt1` (3001..3013, 0 =
 /// cancelled); `AlertDlgOpen` is 1 while it is open. The dialog handle `hPriceAlertDlg` is not modelled.
 pub fn dlg_price_alert_type(g: &mut Globals, ui: &mut dyn Ui, _h_parent: i32) {
@@ -240,7 +240,7 @@ pub fn dlg_price_alert_type(g: &mut Globals, ui: &mut dyn Ui, _h_parent: i32) {
     g.tmp_ext1 = Ext::from_f64(0.0);
     g.alert_dlg_open = 1;
     let prompt = [s(__content.string(11311))];
-    match ui.choose(&s(PRICE_ALERT_DLG_TITLE(&__content)), &prompt, &options) {
+    match ui.select(&s(PRICE_ALERT_DLG_TITLE(&__content)), &prompt, &options, None, &s("Apply")) {
         Some(k) => {
             dlg_price_alert_opt(g, 3001 + cast::<i32, _>(k));
             dlg_price_alert_ok(g, ui);

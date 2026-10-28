@@ -117,9 +117,10 @@ pub fn show_dlg_crypto_skipping_chart(g: &mut Globals, ui: &mut dyn Ui, rng: &mu
             s("BITCOIN TRADING:  Spot: ") + &dlg.btc_price_text,
             s("ETHEREUM TRADING:  Spot: ") + &dlg.eth_price_text,
         ];
-        let shown: Vec<Button> = dlg.buttons.iter().filter(|b| b.enabled).cloned().collect();
+        let shown = dlg.buttons.clone();
         let options: Vec<PbStr> = shown.iter().map(crypto_option_label).collect();
-        match ui.choose(&title, &prompt, &options) {
+        let enabled: Vec<_> = shown.iter().map(|b| b.enabled).collect();
+        match ui.choose_enabled(&title, &prompt, &options, &enabled) {
             Some(k) => dlg_crypto_click_inner(g, ui, rng, now, &mut dlg, shown[k].id, skip_chart),
             None => dlg.open = false,
         }

@@ -204,7 +204,7 @@ pub fn show_ir_swap_dialog(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, _h_p
         }
         let content = crate::content::current();
         let spec = Form {
-            title: title.clone(),
+            title: title.clone(), help_topic: Some(s("interest rate swaps")), help_button: Some(958),
             prompt: vec![s(content.string(11423)), s(content.string(11425)) + &form.current_rate,
                 s(content.string(11428))], fields,
             buttons: [IrSwapControl::Offer, IrSwapControl::Info, IrSwapControl::ViewSwaps,
@@ -330,7 +330,7 @@ pub fn ir_swap_dialog_click(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng, for
         IrSwapControl::Long => ir_swap_sel_long(g),
         IrSwapControl::Short => ir_swap_sel_short(g),
         IrSwapControl::Offer => ir_swap_find_offer_click(g, ui, rng, form),
-        IrSwapControl::Info => ir_swap_help_click(g),
+        IrSwapControl::Info => ir_swap_help_click(g, ui),
         IrSwapControl::ViewSwaps => ir_swap_view_swaps_click(g, ui, rng),
         IrSwapControl::Terminate => ir_swap_terminate_click(g, ui, rng, form),
         IrSwapControl::Exit => ir_swap_cancel_click(form),
@@ -525,9 +525,9 @@ pub fn ir_swap_find_offer_click(g: &mut Globals, ui: &mut dyn Ui, rng: &mut Rng,
 }
 
 /// Port of IRSwap_HelpClick (0x63d6dc), the SWAP INFO button: runs `WSRHELP.EXE |SWAPS|` (the help
-/// viewer, an external program; a no-op in the port).
-pub fn ir_swap_help_click(_g: &Globals) {
-    // SHELL DataPath + "WSRHELP.EXE " + DataPath + "|SWAPS|"
+/// viewer, replaced by imported contextual documentation).
+pub fn ir_swap_help_click(_g: &Globals, ui: &mut dyn Ui) {
+    ui.help("interest rate swaps");
 }
 
 /// Port of IRSwap_ViewSwapsClick (0x63d767): the swap list ([`pick_swap_from_list`]) and the analysis of

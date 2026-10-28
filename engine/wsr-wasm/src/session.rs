@@ -34,6 +34,11 @@ impl Ui for FileUi<'_> {
     fn msgbox(&mut self, text: &PbStr, style: i32, title: &PbStr) -> i32 { self.inner.msgbox(text, style, title) }
     fn inputbox(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr) -> PbStr { self.inner.inputbox(prompt, title, default) }
     fn form(&mut self, form: &wsr_core::ui::Form) -> Option<wsr_core::ui::FormResponse> { self.inner.form(form) }
+    fn help(&mut self, topic: &str) { self.inner.help(topic); }
+    fn database_search(&mut self, view: &logic::info_screens::db_search::DbSearchView)
+        -> Option<Vec<logic::info_screens::db_search::DbSearchAction>> { self.inner.database_search(view) }
+    fn select(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], selected: Option<usize>, accept: &PbStr) -> Option<usize> { self.inner.select(title, prompt, options, selected, accept) }
+    fn choose_enabled(&mut self, title: &PbStr, prompt: &[PbStr], options: &[PbStr], enabled: &[bool]) -> Option<usize> { self.inner.choose_enabled(title, prompt, options, enabled) }
     fn symbol_input(&mut self, prompt: &PbStr, title: &PbStr, default: &PbStr, companies: &[wsr_core::ui::SymbolChoice]) -> PbStr { self.inner.symbol_input(prompt, title, default, companies) }
     fn report(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool) -> ReportAction { self.inner.report(title, lines, yes_no) }
     fn report_with_actions(&mut self, title: &PbStr, lines: &[PbStr], yes_no: bool, options: &wsr_core::ui::ReportOptions) -> ReportAction { self.inner.report_with_actions(title, lines, yes_no, options) }

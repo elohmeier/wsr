@@ -131,7 +131,11 @@ export interface FormField {
 	choices: { value: string; label: string }[];
 	refreshOnChange: boolean;
 }
-export type UIRequest = { token: number; title: string } & (
+export type UIRequest = {
+	token: number;
+	title: string;
+	helpTopic?: string | null;
+} & (
 	| { kind: 'msgbox'; text: string; style: number }
 	| { kind: 'inputbox'; prompt: string; value: string }
 	| {
@@ -142,11 +146,33 @@ export type UIRequest = { token: number; title: string } & (
 	  }
 	| {
 			kind: 'form';
+			helpButton?: number | null;
 			prompt: string[];
 			fields: FormField[];
 			buttons: { id: number; label: string }[];
 	  }
-	| { kind: 'choose'; prompt: string[]; options: string[] }
+	| { kind: 'choose'; prompt: string[]; options: string[]; disabled?: number[] }
+	| {
+			kind: 'select';
+			prompt: string[];
+			options: string[];
+			selected: number | null;
+			accept: string;
+	  }
+	| {
+			kind: 'databaseSearch';
+			prompt: string;
+			count: string;
+			focus: number | null;
+			criteria: {
+				id: number;
+				label: string;
+				checked: boolean;
+				fields: { id: number; label: string; value: string }[];
+				change: { id: number; label: string; value: string } | null;
+			}[];
+			buttons: { id: number; label: string }[];
+	  }
 	| {
 			kind: 'report';
 			lines: string[];

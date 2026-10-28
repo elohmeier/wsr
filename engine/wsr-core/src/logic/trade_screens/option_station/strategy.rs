@@ -232,7 +232,7 @@ fn init_templates(templates: &mut [PbStr], strat_names: &mut [PbStr]) {
 /// OptStrat_GoClick (0x6119df) and OptStrat_CancelClick (0x611a50).
 ///
 /// The modal " [runtime resource wording] " dialog: ten option buttons ([`STRATEGY_NAMES`]) and
-/// GO/CANCEL, shown through [`Ui::choose`]. The choice comes back in `TmpExt1` (1..10; 0 = cancelled or
+/// GO/CANCEL, shown through [`Ui::select`]. The choice comes back in `TmpExt1` (1..10; 0 = cancelled or
 /// GO without a selection). Closing the window after selecting an option keeps that selection (the
 /// option callbacks set `TmpExt1` at once); a host maps that onto `Some`. The dialog procedure only
 /// colours the controls and sets tooltips (window plumbing, not ported); `hOptionStrategyDlg` is not
@@ -241,7 +241,7 @@ pub fn show_option_strategy_picker(g: &mut Globals, ui: &mut dyn Ui, _h_parent: 
     let __content = crate::content::current();
     g.tmp_ext1 = Ext::from_f64(0.0);
     let options: Vec<PbStr> = STRATEGY_NAMES(&__content).iter().map(|x| s(x)).collect();
-    match ui.choose(&s(__content.string(11793)), &[s(__content.string(11794))], &options) {
+    match ui.select(&s(__content.string(11793)), &[s(__content.string(11794))], &options, None, &s("Go")) {
         Some(k) => {
             // OptStrat_Sel*: TmpExt1 = k + 1; then GO
             g.tmp_ext1 = cast::<Ext, _>(k + 1);

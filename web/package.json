@@ -19,6 +19,7 @@
     "test:reliability": "node reliability-browser-test.mjs",
     "test:browser": "node browser-test.mjs",
     "test:forms": "node forms-browser-test.mjs",
+    "test:ui-parity": "node ui-parity-browser-test.mjs",
     "test:coach": "node --import tsx --test src/lib/coach/coach.test.ts",
     "test:coach:browser": "node coach-browser-test.mjs",
     "test:coach:live": "node coach-live-test.mjs"
