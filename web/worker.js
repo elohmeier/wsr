@@ -135,7 +135,7 @@ onmessage = async ({ data: m }) => {
       for (const f of imported) putFile(f.name, f.bytes);
       value = command(0);
     }
-    else if (m.cmd === 'load') value = json(call(w.wsr_open_game, m.bytes, m.fixed ? 1 : 0,
+    else if (m.cmd === 'load') value = json(call(w.wsr_open_game, m.bytes, 0,
       +(m.name?.match(/^GAME(\d+)\.DAT$/i)?.[1] || 1)));
     else if (m.cmd === 'customize') {
       parseCompanies(m.bytes);

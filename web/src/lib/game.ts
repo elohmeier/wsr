@@ -462,10 +462,10 @@ export async function retryStorage() {
 			restored ? { cmd: 'restore', files: restored } : { cmd: 'flush' },
 		);
 }
-export async function resume(name: string, fixed: boolean) {
+export async function resume(name: string) {
 	if (!get(store).ready || get(store).busy) return;
 	const bytes = await rpc({ cmd: 'getfile', name });
-	await run({ cmd: 'load', name, bytes, fixed });
+	await run({ cmd: 'load', name, bytes });
 }
 export async function download(name: string) {
 	const bytes = fileCache.get(name);

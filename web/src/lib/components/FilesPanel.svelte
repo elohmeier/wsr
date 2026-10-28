@@ -3,11 +3,9 @@
 	import * as NativeSelect from '$lib/components/ui/native-select';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
-	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { game, resume, download } from '$lib/game';
 	let { open = $bindable(true) } = $props();
 	let selected = $state(''),
-		fixed = $state(false),
 		entered = $state(false);
 	const saves = $derived(
 		$game.files.filter((f) => /^GAME\d{2}\.DAT$/.test(f.name)),
@@ -39,7 +37,6 @@
 				cmd: installer ? 'installer' : 'load',
 				name: file.name,
 				bytes: new Uint8Array(await file.arrayBuffer()),
-				fixed,
 			});
 		input.value = '';
 	}
@@ -92,18 +89,13 @@
 				id="resume"
 				variant="outline"
 				disabled={!$game.ready || !selected || $game.busy}
-				onclick={() => resume(selected, fixed)}>Open</Button
+				onclick={() => resume(selected)}>Open</Button
 			>
 			<Button
 				id="download"
 				variant="outline"
 				disabled={!selected || $game.busy}
 				onclick={() => download(selected)}>Download file</Button
-			>
-			<Field.Field orientation="horizontal" class="w-auto self-center"
-				><Checkbox id="fixed" bind:checked={fixed} /><Field.Label for="fixed"
-					>Repair legacy save decoder</Field.Label
-				></Field.Field
 			>
 		</div>
 		<p id="file-status" role="status" class="text-sm text-muted-foreground">
