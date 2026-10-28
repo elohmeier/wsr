@@ -605,11 +605,13 @@ body:has(.coach-dock) .app-shell {
 #symbol-form {
 	margin-bottom: 8px;
 }
+#symbol-form [data-slot='field'] {
+	display: grid;
+	grid-template-columns: 95px minmax(0, 1fr) auto;
+	column-gap: 6px;
+}
 #symbol-form input {
 	width: 100%;
-}
-#symbol-form [data-slot='field-label'] {
-	flex: none;
 }
 .wsr-readouts > div {
 	display: grid;
